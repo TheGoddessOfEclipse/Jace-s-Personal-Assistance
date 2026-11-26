@@ -27,7 +27,8 @@
       </button>
       <p id="authErrorMsg" class="auth-error hidden"></p>
     </div>
-  </div>  
+  </div>
+
   <header class="top-header">
     <div class="header-inner">
       <div class="brand">
@@ -98,12 +99,12 @@
         </div>
       </div>
 
-      <!-- 單一整合條列清單 -->
+      <!-- 單一整合條列清單 ＋ 綜合歷史紀錄 -->
       <article class="card briefing-unified-card">
         <div class="briefing-unified-head">
           <div>
             <h2>Today's Briefing</h2>
-            <p class="hint">條列整合三大平台重點：勾選即同步更新狀態（待辦事項將進一步確認進度）</p>
+            <p id="briefingSubHint" class="hint">條列整合三大平台重點：勾選即同步更新狀態（待辦事項將進一步確認進度）</p>
           </div>
           <div class="briefing-quick-links">
             <button type="button" class="btn-ghost-sm" data-jump-tab="teaching">教學進度</button>
@@ -112,8 +113,36 @@
           </div>
         </div>
 
-        <ul id="briefingUnifiedList" class="unified-list"></ul>
-        <div id="briefingTodoHiddenHint" class="briefing-footnote hidden"></div>
+        <div class="list-controls">
+          <div class="sub-tabs">
+            <button type="button" class="sub-tab active" data-briefing-view="today">
+              今日重點 <span id="briefingTodayCount" class="count-pill">0</span>
+            </button>
+            <button type="button" class="sub-tab" data-briefing-view="history">
+              綜合歷史紀錄 <span id="briefingHistoryCount" class="count-pill">0</span>
+            </button>
+          </div>
+          <div id="briefingHistoryFilters" class="filters hidden">
+            <select id="briefingHistoryFilterType">
+              <option value="all">全部平台</option>
+              <option value="teaching">教學進度平台</option>
+              <option value="todo">待辦事項平台</option>
+              <option value="event">活動提醒平台</option>
+            </select>
+            <input type="text" id="briefingHistorySearch" placeholder="搜尋歷史紀錄..." />
+          </div>
+        </div>
+
+        <!-- 今日重點視圖 -->
+        <div id="briefingTodayWrap">
+          <ul id="briefingUnifiedList" class="unified-list"></ul>
+          <div id="briefingTodoHiddenHint" class="briefing-footnote hidden"></div>
+        </div>
+
+        <!-- 綜合歷史紀錄視圖 -->
+        <div id="briefingHistoryWrap" class="hidden">
+          <ul id="briefingHistoryList" class="unified-list"></ul>
+        </div>
       </article>
     </section>
 
@@ -134,7 +163,7 @@
       <div class="panel-toolbar card">
         <div class="toolbar-title">
           <h2 id="activeClassHeading">進度表設定</h2>
-          <p class="hint">操作提示：拖曳或長按移位｜點一下標記完成｜點兩下編輯詳情｜點「設為今日」可釘選該班今日進度</p>
+          <p class="hint">操作提示：拖曳或長按移位｜點一下標記完成｜點項目上的 ✎ 編輯、❐ 複製｜開啟「多選複製」可批次複製多個項目</p>
         </div>
         <div class="grid-config-form">
           <label class="inline-field">
@@ -146,6 +175,25 @@
             <input type="number" id="periodsInput" min="1" max="15" value="4" />
           </label>
           <button type="button" id="generateTableBtn" class="btn-primary">生成／更新表格</button>
+          <button type="button" id="toggleMultiSelectBtn" class="btn-ghost">☑ 多選複製</button>
+        </div>
+      </div>
+
+      <!-- 多選批次複製工具列 -->
+      <div id="batchActionBar" class="batch-bar card hidden">
+        <div class="batch-bar-left">
+          <span class="batch-badge">多選模式</span>
+          <span class="batch-info">已選取 <strong id="batchSelectedCount">0</strong> 個項目（點擊待排區或進度表中的項目即可複選）</span>
+        </div>
+        <div class="batch-bar-right">
+          <button type="button" id="batchSelectAllStagingBtn" class="btn-ghost-sm">全選待排區</button>
+          <button type="button" id="batchClearSelectionBtn" class="btn-ghost-sm">清除選取</button>
+          <label class="batch-target-label">
+            <span>複製至</span>
+            <select id="batchTargetClassSelect"></select>
+          </label>
+          <button type="button" id="batchDuplicateBtn" class="btn-primary btn-sm">❐ 複製選取項目</button>
+          <button type="button" id="exitMultiSelectBtn" class="btn-ghost-sm">完成多選</button>
         </div>
       </div>
 
@@ -186,8 +234,11 @@
 
           <div class="card staging-box">
             <div class="staging-header">
-              <h3>待排區</h3>
-              <span id="stagingCount" class="count-pill">0</span>
+              <div class="staging-header-left">
+                <h3>待排區</h3>
+                <span id="stagingCount" class="count-pill">0</span>
+              </div>
+              <button type="button" id="stagingMultiBtn" class="btn-ghost-sm">☑ 多選</button>
             </div>
             <div id="stagingList" class="drop-zone staging-list" data-drop-type="staging"></div>
           </div>
@@ -343,7 +394,7 @@
   <div id="planModal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>教學事項詳情</h3>
+        <h3>教學事項詳情與編輯</h3>
         <button type="button" class="modal-close" data-close="planModal">&times;</button>
       </div>
       <div class="modal-body form-stack">
@@ -374,7 +425,10 @@
         </div>
       </div>
       <div class="modal-footer space-between">
-        <button type="button" id="deletePlanItemBtn" class="btn-danger">刪除事項</button>
+        <div class="btn-group">
+          <button type="button" id="deletePlanItemBtn" class="btn-danger">刪除</button>
+          <button type="button" id="duplicatePlanModalBtn" class="btn-ghost">❐ 複製項目</button>
+        </div>
         <div class="btn-group">
           <button type="button" class="btn-ghost" data-close="planModal">取消</button>
           <button type="button" id="savePlanEditBtn" class="btn-primary">儲存變更</button>
@@ -537,7 +591,6 @@
   </div>
 
   <div id="toastContainer" class="toast-container"></div>
-  
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>

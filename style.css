@@ -78,7 +78,7 @@ body {
 .header-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -306,6 +306,12 @@ button {
   background: var(--bg-soft);
 }
 
+.btn-ghost.active-toggle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
+}
+
 .btn-ghost-sm {
   background: var(--bg-soft);
   color: var(--ink-secondary);
@@ -319,6 +325,12 @@ button {
 .btn-ghost-sm:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.btn-ghost-sm.active-toggle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
 }
 
 .danger-outline:hover {
@@ -473,7 +485,6 @@ button {
   gap: 14px;
 }
 
-/* RPG 對話框左側小指向尖角 */
 .rpg-dialogue-box::before {
   content: '';
   position: absolute;
@@ -567,8 +578,8 @@ button {
   align-items: flex-start;
   gap: 14px;
   flex-wrap: wrap;
-  padding-bottom: 16px;
-  margin-bottom: 16px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -588,6 +599,7 @@ button {
 .unified-row {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 12px;
   padding: 13px 16px;
   background: var(--bg-soft);
@@ -612,6 +624,10 @@ button {
 .unified-row.is-next-preview {
   background: #FAF8F3;
   border-style: dashed;
+}
+
+.unified-row.is-history-row {
+  background: #FAF9F6;
 }
 
 .unified-check-label {
@@ -706,6 +722,13 @@ button {
   padding-left: 2px;
 }
 
+.history-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .color-dot {
   width: 9px;
   height: 9px;
@@ -792,13 +815,13 @@ button {
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .grid-config-form {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -815,9 +838,60 @@ button {
   text-align: center;
 }
 
+/* 多選批次複製工具列 */
+.batch-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 13px 18px;
+  margin-bottom: 16px;
+  background: var(--accent-soft);
+  border: 1.5px solid var(--accent);
+}
+
+.batch-bar-left,
+.batch-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.batch-badge {
+  background: var(--accent);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+
+.batch-info {
+  font-size: 13px;
+  color: var(--ink-primary);
+}
+
+.batch-target-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+}
+
+.batch-target-label select {
+  width: auto;
+  min-width: 115px;
+  padding: 5px 9px;
+  font-size: 12.5px;
+  background: #FFFFFF;
+}
+
 .teaching-layout {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 330px 1fr;
   gap: 20px;
   align-items: start;
 }
@@ -878,7 +952,14 @@ input[type="color"] {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
+}
+
+.staging-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .staging-header h3 {
@@ -887,7 +968,7 @@ input[type="color"] {
 
 .staging-list {
   min-height: 120px;
-  max-height: 340px;
+  max-height: 360px;
   overflow-y: auto;
   padding: 10px;
   background: var(--bg-soft);
@@ -1018,20 +1099,21 @@ input[type="color"] {
   outline-offset: -3px;
 }
 
+/* 教學事項標籤（含快速編輯／複製按鈕與多選樣式） */
 .plan-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 11px;
+  padding: 5px 9px 5px 10px;
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
   user-select: none;
   -webkit-user-select: none;
   cursor: grab;
-  border: 1px solid rgba(51, 48, 46, 0.1);
+  border: 1px solid rgba(51, 48, 46, 0.12);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: transform 0.15s, opacity 0.2s, box-shadow 0.15s;
+  transition: transform 0.15s, opacity 0.2s, box-shadow 0.15s, outline 0.15s;
   max-width: 100%;
 }
 
@@ -1042,11 +1124,44 @@ input[type="color"] {
 
 .plan-chip.completed {
   opacity: 0.58;
+}
+
+.plan-chip.completed .chip-name {
   text-decoration: line-through;
 }
 
 .plan-chip.completed .chip-check {
   display: inline-block;
+}
+
+.plan-chip.multi-selectable {
+  cursor: pointer;
+}
+
+.plan-chip.is-selected {
+  outline: 2.5px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: 0 3px 10px rgba(91, 110, 92, 0.28);
+}
+
+.chip-select-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  border: 1.5px solid currentColor;
+  font-size: 11px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.plan-chip.is-selected .chip-select-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #FFFFFF;
 }
 
 .chip-check {
@@ -1057,10 +1172,40 @@ input[type="color"] {
 
 .chip-type {
   font-size: 11px;
-  opacity: 0.78;
+  opacity: 0.8;
   padding: 1px 6px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.chip-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 2px;
+  padding-left: 4px;
+  border-left: 1px solid rgba(51, 48, 46, 0.15);
+}
+
+.chip-action-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.65;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.chip-action-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .plan-chip.dragging-source {
@@ -1549,82 +1694,7 @@ input[type="color"] {
   flex: 1;
 }
 
-/* ==================== Toast ==================== */
-.toast-container {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 200;
-}
-
-.toast {
-  background: var(--ink-primary);
-  color: #FFFFFF;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  box-shadow: var(--shadow-md);
-  animation: slideUp 0.25s ease;
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ==================== Responsive ==================== */
-@media (max-width: 960px) {
-  .teaching-layout,
-  .two-col-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .staging-sidebar,
-  .form-panel {
-    position: static;
-  }
-}
-
-@media (max-width: 680px) {
-  .rpg-stage {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .rpg-dialogue-box {
-    width: 100%;
-  }
-
-  .rpg-dialogue-box::before {
-    left: 50%;
-    top: -10px;
-    bottom: auto;
-    transform: translateX(-50%) rotate(135deg);
-  }
-}
-
-@media (max-width: 600px) {
-  .container {
-    padding: 16px;
-  }
-
-  .field-row {
-    flex-direction: column;
-  }
-
-  .col-week {
-    width: 66px;
-  }
-
-  .col-period {
-    width: 82px;
-  }
-}
-
-/* ==================== Firebase 同步狀態標籤 ==================== */
+/* ==================== Firebase 同步與 Google 登入閘門 ==================== */
 .sync-pill {
   font-size: 12px;
   padding: 5px 11px;
@@ -1653,7 +1723,6 @@ input[type="color"] {
   color: var(--danger);
 }
 
-/* ==================== Google 登入閘門與帳號列 ==================== */
 .auth-gate {
   position: fixed;
   inset: 0;
@@ -1738,4 +1807,79 @@ input[type="color"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ==================== Toast ==================== */
+.toast-container {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+}
+
+.toast {
+  background: var(--ink-primary);
+  color: #FFFFFF;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== Responsive ==================== */
+@media (max-width: 960px) {
+  .teaching-layout,
+  .two-col-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .staging-sidebar,
+  .form-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 680px) {
+  .rpg-stage {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .rpg-dialogue-box {
+    width: 100%;
+  }
+
+  .rpg-dialogue-box::before {
+    left: 50%;
+    top: -10px;
+    bottom: auto;
+    transform: translateX(-50%) rotate(135deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 16px;
+  }
+
+  .field-row {
+    flex-direction: column;
+  }
+
+  .col-week {
+    width: 66px;
+  }
+
+  .col-period {
+    width: 82px;
+  }
 }

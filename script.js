@@ -12,7 +12,7 @@
     appId: "1:222352360644:web:693d06971123e5afbcf591"
   };
 
-  // 請填入允許登入此線上秘書的 Gmail（小寫皆可）
+  // 請填入允許登入此線上秘書的 Gmail
   const ALLOWED_EMAILS = [
     "你的Gmail@gmail.com"
   ];
@@ -23,6 +23,13 @@
   let dbRef = null;
   let isCloudConnected = false;
   let saveTimer = null;
+
+  // UI 狀態
+  let currentBriefingView = 'today'; // 'today' | 'history'
+  let currentTodoView = 'active';
+  let currentEventView = 'upcoming';
+  let isMultiSelectMode = false;
+  let selectedPlanIds = new Set();
 
   function setSyncStatus(statusType, text) {
     const badge = document.getElementById('syncStatusBadge');
@@ -78,8 +85,10 @@
   }
 
   // ==================== 工具函式 ====================
+  let uidSeq = 0;
   function uid(prefix = 'id') {
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    uidSeq += 1;
+    return `${prefix}_${Date.now()}_${uidSeq}_${Math.random().toString(36).slice(2, 6)}`;
   }
 
   function toArray(val) {
@@ -248,8 +257,6 @@
   }
 
   let state = loadLocalState();
-  let currentTodoView = 'active';
-  let currentEventView = 'upcoming';
 
   // ==================== Firebase Auth 與即時同步 ====================
   function pushToCloud() {
@@ -337,7 +344,6 @@
     const userControls = document.getElementById('userControls');
     const userEmailDisplay = document.getElementById('userEmailDisplay');
 
-    // 點擊 Google 登入
     document.getElementById('googleLoginBtn').addEventListener('click', () => {
       showAuthError('');
       auth.signInWithPopup(provider).catch((err) => {
@@ -352,14 +358,12 @@
       });
     });
 
-    // 點擊登出
     document.getElementById('logoutBtn').addEventListener('click', () => {
       if (!confirm('確定要登出嗎？')) return;
       stopCloudSync();
       auth.signOut();
     });
 
-    // 監聽登入狀態
     auth.onAuthStateChanged((user) => {
       if (!user) {
         stopCloudSync();
@@ -369,7 +373,6 @@
         return;
       }
 
-      // 檢查白名單（若尚未修改預設文字則先放行，方便初次測試）
       const activeWhitelist = ALLOWED_EMAILS
         .map(e => e.trim().toLowerCase())
         .filter(e => e && !e.includes('你的gmail'));
@@ -521,8 +524,22 @@
     return { todaySlot, nextSlot, isPinned };
   }
 
-  // ==================== 首頁：RPG 個人秘書與整合條列 Briefing ====================
+  // ==================== 首頁：RPG 個人秘書、整合條列與綜合歷史紀錄 ====================
   function initBriefing() {
+    // 切換 今日重點 / 綜合歷史紀錄
+    document.querySelectorAll('[data-briefing-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentBriefingView = btn.dataset.briefingView;
+        updateBriefingViewUI();
+        renderBriefingHistory();
+      });
+    });
+
+    ['briefingHistoryFilterType', 'briefingHistorySearch'].forEach(id => {
+      document.getElementById(id).addEventListener('input', renderBriefingHistory);
+    });
+
+    // RPG 秘書立繪上傳
     const portraitBox = document.getElementById('rpgPortraitBox');
     const avatarInput = document.getElementById('rpgAvatarInput');
 
@@ -604,6 +621,19 @@
     });
   }
 
+  function updateBriefingViewUI() {
+    document.querySelectorAll('[data-briefing-view]').forEach(b => {
+      b.classList.toggle('active', b.dataset.briefingView === currentBriefingView);
+    });
+    const isHistory = currentBriefingView === 'history';
+    document.getElementById('briefingTodayWrap').classList.toggle('hidden', isHistory);
+    document.getElementById('briefingHistoryWrap').classList.toggle('hidden', !isHistory);
+    document.getElementById('briefingHistoryFilters').classList.toggle('hidden', !isHistory);
+    document.getElementById('briefingSubHint').textContent = isHistory
+      ? '彙整三大平台所有已完成教學事項、結案待辦與已結束／歸檔活動，依日期由近至遠排列'
+      : '條列整合三大平台重點：勾選即同步更新狀態（待辦事項將進一步確認進度）';
+  }
+
   function openTodoResolveModal(todo) {
     document.getElementById('resolveTodoId').value = todo.id;
     document.getElementById('resolveTodoTitleDisplay').textContent = todo.title;
@@ -656,7 +686,188 @@
     `;
   }
 
+  function renderBriefingHistory() {
+    const today = getTodayStr();
+    const filterType = document.getElementById('briefingHistoryFilterType').value;
+    const keyword = document.getElementById('briefingHistorySearch').value.trim().toLowerCase();
+
+    const records = [];
+
+    // 1. 已完成的教學進度事項（跨全部班級）
+    state.teaching.classes.forEach(cls => {
+      cls.items
+        .filter(item => item.completed)
+        .forEach(item => {
+          const locText = item.location.type === 'cell'
+            ? `${cls.name}・W${item.location.week}-第${item.location.period}節`
+            : `${cls.name}・待排區`;
+          records.push({
+            platform: 'teaching',
+            sortDate: item.completedAt || '0000-00-00',
+            dateLabel: item.completedAt ? `完成於 ${item.completedAt}` : '已完成',
+            searchText: `${cls.name} ${item.name} ${item.type || ''} ${item.desc || ''}`.toLowerCase(),
+            cls,
+            item,
+            locText
+          });
+        });
+    });
+
+    // 2. 已結案的待辦事項
+    state.todos
+      .filter(t => t.status === 'completed')
+      .forEach(todo => {
+        const src = getSourceById(todo.sourceId);
+        records.push({
+          platform: 'todo',
+          sortDate: todo.completedAt || todo.date || '0000-00-00',
+          dateLabel: `建立：${todo.date}｜完成：${todo.completedAt || '-'}`,
+          searchText: `${src.name} ${todo.title} ${todo.content || ''} ${todo.note || ''}`.toLowerCase(),
+          todo,
+          src
+        });
+      });
+
+    // 3. 已結束或已歸檔的活動
+    state.events
+      .filter(e => e.archived || e.date < today)
+      .forEach(evt => {
+        records.push({
+          platform: 'event',
+          sortDate: evt.archivedAt || evt.date || '0000-00-00',
+          dateLabel: evt.archived
+            ? `活動日：${evt.date}｜已處理歸檔${evt.archivedAt ? `（${evt.archivedAt}）` : ''}`
+            : `活動日：${evt.date}｜已結束`,
+          searchText: `${evt.name} ${evt.location || ''} ${evt.time || ''} ${evt.note || ''}`.toLowerCase(),
+          evt
+        });
+      });
+
+    // 依時間由近至遠排序
+    records.sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+
+    document.getElementById('briefingHistoryCount').textContent = records.length;
+
+    const filtered = records.filter(rec => {
+      if (filterType !== 'all' && rec.platform !== filterType) return false;
+      if (keyword && !rec.searchText.includes(keyword)) return false;
+      return true;
+    });
+
+    const listEl = document.getElementById('briefingHistoryList');
+    listEl.innerHTML = '';
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<li class="empty-state">目前沒有符合條件的綜合歷史紀錄。</li>';
+      return;
+    }
+
+    filtered.forEach(rec => {
+      const li = document.createElement('li');
+      li.className = 'unified-row is-history-row';
+
+      if (rec.platform === 'teaching') {
+        const { item, locText } = rec;
+        li.innerHTML = `
+          <div class="unified-body">
+            <div class="unified-main-line">
+              <span class="origin-tag origin-teaching">來自 教學進度平台</span>
+              <span class="origin-slash">/</span>
+              <span class="unified-sub-pill">${escapeHtml(locText)}</span>
+              <span class="unified-content-title">
+                <span class="color-dot" style="background:${item.color}"></span>
+                ${escapeHtml(item.name)}${item.type ? `（${escapeHtml(item.type)}）` : ''}
+              </span>
+              <span class="date-tag">${escapeHtml(rec.dateLabel)}</span>
+            </div>
+            ${item.desc ? `<div class="unified-sub-line">備註：${escapeHtml(item.desc)}</div>` : ''}
+          </div>
+          <div class="history-row-actions">
+            <button type="button" class="text-btn" data-restore-plan>恢復未完成</button>
+          </div>
+        `;
+        li.querySelector('[data-restore-plan]').addEventListener('click', () => {
+          item.completed = false;
+          item.completedAt = null;
+          saveState();
+          renderTeaching();
+          renderBriefing();
+          showToast(`已恢復「${item.name}」為未完成`);
+        });
+      } else if (rec.platform === 'todo') {
+        const { todo, src } = rec;
+        li.style.borderLeft = `4px solid ${src.color}`;
+        const subParts = [
+          todo.content ? todo.content : '',
+          todo.note ? `備註：${todo.note}` : ''
+        ].filter(Boolean);
+
+        li.innerHTML = `
+          <div class="unified-body">
+            <div class="unified-main-line">
+              <span class="origin-tag origin-todo">來自 待辦事項平台</span>
+              <span class="origin-slash">/</span>
+              <span class="source-badge" style="background:${src.color};color:${getContrastColor(src.color)}">${escapeHtml(src.name)}</span>
+              <span class="unified-content-title">${escapeHtml(todo.title)}</span>
+              <span class="date-tag">${escapeHtml(rec.dateLabel)}</span>
+            </div>
+            ${subParts.length ? `<div class="unified-sub-line">${escapeHtml(subParts.join('｜'))}</div>` : ''}
+          </div>
+          <div class="history-row-actions">
+            <button type="button" class="text-btn" data-restore-todo>復原至待辦</button>
+          </div>
+        `;
+        li.querySelector('[data-restore-todo]').addEventListener('click', () => {
+          todo.status = 'not_started';
+          todo.completedAt = null;
+          todo.todayDoneDate = null;
+          saveState();
+          renderTodos();
+          renderBriefing();
+          showToast(`已復原待辦「${todo.title}」`);
+        });
+      } else if (rec.platform === 'event') {
+        const { evt } = rec;
+        const canRestore = evt.archived && evt.date >= today;
+        const metaParts = [
+          evt.time ? `時間：${evt.time}` : '',
+          evt.location ? `地點：${evt.location}` : '',
+          evt.note ? `備註：${evt.note}` : ''
+        ].filter(Boolean);
+
+        li.innerHTML = `
+          <div class="unified-body">
+            <div class="unified-main-line">
+              <span class="origin-tag origin-event">來自 活動提醒平台</span>
+              <span class="origin-slash">/</span>
+              <span class="unified-content-title">${escapeHtml(evt.name)}</span>
+              <span class="date-tag">${escapeHtml(rec.dateLabel)}</span>
+            </div>
+            ${metaParts.length ? `<div class="unified-sub-line">${escapeHtml(metaParts.join('｜'))}</div>` : ''}
+          </div>
+          <div class="history-row-actions">
+            ${canRestore ? '<button type="button" class="text-btn" data-restore-evt>復原活動</button>' : ''}
+          </div>
+        `;
+        const restoreBtn = li.querySelector('[data-restore-evt]');
+        if (restoreBtn) {
+          restoreBtn.addEventListener('click', () => {
+            evt.archived = false;
+            evt.archivedAt = null;
+            saveState();
+            renderEvents();
+            renderBriefing();
+            showToast(`已復原活動「${evt.name}」`);
+          });
+        }
+      }
+
+      listEl.appendChild(li);
+    });
+  }
+
   function renderBriefing() {
+    updateBriefingViewUI();
     const today = getTodayStr();
     const listEl = document.getElementById('briefingUnifiedList');
     listEl.innerHTML = '';
@@ -830,6 +1041,8 @@
       listEl.appendChild(li);
     });
 
+    document.getElementById('briefingTodayCount').textContent = rowCount;
+
     if (rowCount === 0) {
       listEl.innerHTML = '<li class="empty-state">目前沒有待處理的重點事項。可點選上方分頁新增教學進度、待辦或活動提醒。</li>';
     }
@@ -847,10 +1060,86 @@
       eventsCount: upcoming7Days.length,
       todosCount: visibleTodos.length
     });
+    renderBriefingHistory();
   }
 
-  // ==================== 第一部分：教學進度平台（含多班級切換） ====================
+  // ==================== 第一部分：教學進度平台（多班級、編輯、複製、多選批次複製） ====================
+  function setMultiSelectMode(enabled) {
+    isMultiSelectMode = enabled;
+    if (!enabled) selectedPlanIds.clear();
+    renderTeaching();
+  }
+
+  function duplicatePlanItems(itemIds, targetClassId = null) {
+    const sourceCls = getActiveClass();
+    const targetCls = state.teaching.classes.find(c => c.id === targetClassId) || sourceCls;
+    const idSet = new Set(itemIds);
+    const itemsToCopy = sourceCls.items.filter(item => idSet.has(item.id));
+
+    if (itemsToCopy.length === 0) {
+      showToast('請先選取至少一個要複製的項目');
+      return;
+    }
+
+    itemsToCopy.forEach(item => {
+      targetCls.items.push({
+        id: uid('plan'),
+        name: item.name,
+        type: item.type || '',
+        color: item.color || '#DDE6D5',
+        desc: item.desc || '',
+        completed: false,
+        completedAt: null,
+        location: { type: 'staging' }
+      });
+    });
+
+    saveState();
+    renderTeaching();
+    renderBriefing();
+
+    if (itemsToCopy.length === 1) {
+      showToast(`已複製「${itemsToCopy[0].name}」至「${targetCls.name}」待排區`);
+    } else {
+      showToast(`已一次複製 ${itemsToCopy.length} 個項目至「${targetCls.name}」待排區`);
+    }
+  }
+
   function initTeaching() {
+    // 多選模式切換與批次操作
+    document.getElementById('toggleMultiSelectBtn').addEventListener('click', () => {
+      setMultiSelectMode(!isMultiSelectMode);
+    });
+    document.getElementById('stagingMultiBtn').addEventListener('click', () => {
+      setMultiSelectMode(!isMultiSelectMode);
+    });
+    document.getElementById('exitMultiSelectBtn').addEventListener('click', () => {
+      setMultiSelectMode(false);
+    });
+
+    document.getElementById('batchSelectAllStagingBtn').addEventListener('click', () => {
+      const cls = getActiveClass();
+      cls.items
+        .filter(i => i.location.type === 'staging')
+        .forEach(i => selectedPlanIds.add(i.id));
+      renderTeaching();
+    });
+
+    document.getElementById('batchClearSelectionBtn').addEventListener('click', () => {
+      selectedPlanIds.clear();
+      renderTeaching();
+    });
+
+    document.getElementById('batchDuplicateBtn').addEventListener('click', () => {
+      const targetClassId = document.getElementById('batchTargetClassSelect').value;
+      const ids = Array.from(selectedPlanIds);
+      if (ids.length === 0) return showToast('請先點擊項目進行選取');
+      duplicatePlanItems(ids, targetClassId);
+      selectedPlanIds.clear();
+      renderTeaching();
+    });
+
+    // 新增／重新命名／刪除班級
     document.getElementById('addClassBtn').addEventListener('click', () => {
       document.getElementById('classModalMode').value = 'add';
       document.getElementById('classModalTitle').textContent = '新增班級';
@@ -878,6 +1167,7 @@
         const newCls = createDefaultClass(name, current.weeks, current.periods);
         state.teaching.classes.push(newCls);
         state.teaching.activeClassId = newCls.id;
+        selectedPlanIds.clear();
         showToast(`已新增班級「${name}」`);
       } else {
         const cls = getActiveClass();
@@ -899,6 +1189,7 @@
       if (!confirm(`確定要刪除「${cls.name}」及其所有排課資料嗎？`)) return;
       state.teaching.classes = state.teaching.classes.filter(c => c.id !== cls.id);
       state.teaching.activeClassId = state.teaching.classes[0].id;
+      selectedPlanIds.clear();
       saveState();
       renderTeaching();
       renderBriefing();
@@ -978,6 +1269,7 @@
       showToast(`已加入「${cls.name}」待排區`);
     });
 
+    // 編輯視窗：儲存、複製、刪除
     document.getElementById('savePlanEditBtn').addEventListener('click', () => {
       const cls = getActiveClass();
       const id = document.getElementById('editPlanId').value;
@@ -1003,11 +1295,19 @@
       showToast('已更新教學事項');
     });
 
+    document.getElementById('duplicatePlanModalBtn').addEventListener('click', () => {
+      const id = document.getElementById('editPlanId').value;
+      if (!id) return;
+      duplicatePlanItems([id]);
+      closeModal('planModal');
+    });
+
     document.getElementById('deletePlanItemBtn').addEventListener('click', () => {
       const cls = getActiveClass();
       const id = document.getElementById('editPlanId').value;
       if (!confirm('確定要刪除此教學事項嗎？')) return;
       cls.items = cls.items.filter(i => i.id !== id);
+      selectedPlanIds.delete(id);
       saveState();
       renderTeaching();
       renderBriefing();
@@ -1017,18 +1317,48 @@
   }
 
   function createPlanChip(item) {
+    const isSelected = selectedPlanIds.has(item.id);
     const chip = document.createElement('div');
-    chip.className = `plan-chip${item.completed ? ' completed' : ''}`;
+    chip.className = `plan-chip${item.completed ? ' completed' : ''}${isMultiSelectMode ? ' multi-selectable' : ''}${isSelected ? ' is-selected' : ''}`;
     chip.dataset.itemId = item.id;
     chip.style.backgroundColor = item.color;
     chip.style.color = getContrastColor(item.color);
-    chip.title = '拖曳或長按可移位｜點一下標記完成｜點兩下編輯詳情';
+    chip.title = isMultiSelectMode
+      ? '點擊選取或取消選取此項目'
+      : '拖曳或長按可移位｜點一下標記完成｜點右側圖示編輯或複製';
 
     chip.innerHTML = `
+      ${isMultiSelectMode ? `<span class="chip-select-box">${isSelected ? '✓' : ''}</span>` : ''}
       <span class="chip-check">✓</span>
       <span class="chip-name">${escapeHtml(item.name)}</span>
       ${item.type ? `<span class="chip-type">${escapeHtml(item.type)}</span>` : ''}
+      ${!isMultiSelectMode ? `
+        <span class="chip-actions">
+          <button type="button" class="chip-action-btn" data-chip-edit title="編輯此項目">✎</button>
+          <button type="button" class="chip-action-btn" data-chip-copy title="複製此項目至待排區">❐</button>
+        </span>
+      ` : ''}
     `;
+
+    // 快速編輯與單筆複製按鈕（阻擋冒泡避免誤觸拖曳或切換完成）
+    const editBtn = chip.querySelector('[data-chip-edit]');
+    const copyBtn = chip.querySelector('[data-chip-copy]');
+
+    if (editBtn) {
+      editBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openPlanEditModal(item.id);
+      });
+    }
+
+    if (copyBtn) {
+      copyBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+      copyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        duplicatePlanItems([item.id]);
+      });
+    }
 
     attachChipInteractions(chip, item.id);
     return chip;
@@ -1037,8 +1367,23 @@
   let clickTracker = { id: null, timer: null };
 
   function attachChipInteractions(chip, itemId) {
+    // 多選模式下：單純點擊切換選取，停用拖曳與完成切換
+    if (isMultiSelectMode) {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (selectedPlanIds.has(itemId)) {
+          selectedPlanIds.delete(itemId);
+        } else {
+          selectedPlanIds.add(itemId);
+        }
+        renderTeaching();
+      });
+      return;
+    }
+
     chip.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 && e.pointerType === 'mouse') return;
+      if (e.target.closest('.chip-actions')) return;
 
       const startX = e.clientX;
       const startY = e.clientY;
@@ -1182,6 +1527,33 @@
     const today = getTodayStr();
     const { todaySlot, isPinned } = getClassLessonBriefing(cls);
 
+    // 清理已不存在於目前班級的選取 ID
+    const validIds = new Set(cls.items.map(i => i.id));
+    Array.from(selectedPlanIds).forEach(id => {
+      if (!validIds.has(id)) selectedPlanIds.delete(id);
+    });
+
+    // 多選工具列狀態同步
+    const batchBar = document.getElementById('batchActionBar');
+    const toggleBtn = document.getElementById('toggleMultiSelectBtn');
+    const stagingMultiBtn = document.getElementById('stagingMultiBtn');
+
+    batchBar.classList.toggle('hidden', !isMultiSelectMode);
+    toggleBtn.classList.toggle('active-toggle', isMultiSelectMode);
+    stagingMultiBtn.classList.toggle('active-toggle', isMultiSelectMode);
+    toggleBtn.textContent = isMultiSelectMode ? '✓ 退出多選' : '☑ 多選複製';
+    stagingMultiBtn.textContent = isMultiSelectMode ? '退出多選' : '☑ 多選';
+    document.getElementById('batchSelectedCount').textContent = selectedPlanIds.size;
+
+    // 複製目標班級下拉選單
+    const targetSelect = document.getElementById('batchTargetClassSelect');
+    const prevTarget = targetSelect.value;
+    targetSelect.innerHTML = state.teaching.classes
+      .map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.id === cls.id ? '（本班）' : ''}</option>`)
+      .join('');
+    targetSelect.value = state.teaching.classes.some(c => c.id === prevTarget) ? prevTarget : cls.id;
+
+    // 班級切換按鈕
     const tabsWrap = document.getElementById('classTabsContainer');
     tabsWrap.innerHTML = '';
     state.teaching.classes.forEach(c => {
@@ -1191,6 +1563,7 @@
       btn.textContent = c.name;
       btn.addEventListener('click', () => {
         state.teaching.activeClassId = c.id;
+        selectedPlanIds.clear();
         saveState();
         renderTeaching();
       });
@@ -1201,6 +1574,7 @@
     document.getElementById('weeksInput').value = cls.weeks;
     document.getElementById('periodsInput').value = cls.periods;
 
+    // 待排區
     const stagingList = document.getElementById('stagingList');
     stagingList.innerHTML = '';
     const stagingItems = cls.items.filter(i => i.location.type === 'staging');
@@ -1212,6 +1586,7 @@
       stagingItems.forEach(item => stagingList.appendChild(createPlanChip(item)));
     }
 
+    // 進度表
     const tbody = document.getElementById('progressTableBody');
     tbody.innerHTML = '';
 
@@ -1571,6 +1946,7 @@
           state.todos = state.todos.filter(t => t.id !== todo.id);
           saveState();
           renderTodos();
+          renderBriefing();
         });
 
         historyContainer.appendChild(card);
