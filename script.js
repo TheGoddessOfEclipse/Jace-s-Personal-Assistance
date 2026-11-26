@@ -26,6 +26,9 @@
   let dbRef = null;
   let isCloudConnected = false;
   let saveTimer = null;
+  const CLIENT_ID = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  let localSyncSeq = 0;
+
 
   // UI 與 AI 狀態
   let currentBriefingView = 'today'; // 'today' | 'history'
@@ -370,7 +373,11 @@
   function pushToCloud() {
     if (!isCloudConnected || !dbRef) return;
     setSyncStatus('syncing', '↻ 同步中...');
+    localSyncSeq += 1;
     const payload = JSON.parse(JSON.stringify(state));
+    payload._syncClient = CLIENT_ID;
+    payload._syncSeq = localSyncSeq;
+
     dbRef.set(payload)
       .then(() => {
         setSyncStatus('synced', '☁️ 雲端已同步');
@@ -409,6 +416,13 @@
           pushToCloud();
           return;
         }
+
+        // 若是本分頁自己剛推上去的回彈資料，直接更新狀態燈號，不重繪畫面打斷輸入
+        if (cloudData._syncClient === CLIENT_ID && cloudData._syncSeq <= localSyncSeq) {
+          setSyncStatus('synced', '☁️ 雲端已同步');
+          return;
+        }
+
         state = migrateAndNormalizeState(cloudData);
         const dailyChanged = normalizeDailyStates(state);
 
@@ -2819,8 +2833,6 @@
       });
     };
 
-    renderList(upcomingAll, 'eventUpcomingList', false);
-    renderList(historyAll, 'eventHistoryList', true);
     renderList(upcomingAll, 'eventUpcomingList', false);
     renderList(historyAll, 'eventHistoryList', true);
     renderEventCalendar();
