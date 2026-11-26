@@ -35,6 +35,7 @@
   let selectedPlanIds = new Set();
 
   let isGeneratingAiBriefing = false;
+  let hasAutoRefreshedOnLoad = false;
   let lastFailedBriefingHash = '';
   let latestBriefingPayload = null;
   let aiAutoTimer = null;
@@ -1046,6 +1047,7 @@
     if (!apiKey || isGeneratingAiBriefing) return;
 
     isGeneratingAiBriefing = true;
+    hasAutoRefreshedOnLoad = true;
     const dialogueEl = document.getElementById('rpgDialogueText');
     const refreshBtn = document.getElementById('rpgRefreshAiBtn');
     const aiBadge = document.getElementById('rpgAiBadge');
@@ -1191,7 +1193,9 @@
       return;
     }
 
-    if (state.secretary.lastBriefingHash === hash && state.secretary.lastBriefingText) {
+    const shouldForceOnLoad = !hasAutoRefreshedOnLoad;
+
+    if (!shouldForceOnLoad && state.secretary.lastBriefingHash === hash && state.secretary.lastBriefingText) {
       dialogueEl.classList.remove('is-loading');
       dialogueEl.textContent = state.secretary.lastBriefingText;
       return;
@@ -1199,13 +1203,17 @@
 
     if (!isGeneratingAiBriefing) {
       dialogueEl.textContent = state.secretary.lastBriefingText || buildFallbackDialogue(payload);
-      if (lastFailedBriefingHash !== hash) {
+      if (shouldForceOnLoad || lastFailedBriefingHash !== hash) {
         clearTimeout(aiAutoTimer);
         aiAutoTimer = setTimeout(() => {
-          if (latestBriefingPayload && latestBriefingPayload.hash === hash && state.secretary.lastBriefingHash !== hash) {
+          if (
+            latestBriefingPayload &&
+            (!hasAutoRefreshedOnLoad || state.secretary.lastBriefingHash !== latestBriefingPayload.hash)
+          ) {
+            hasAutoRefreshedOnLoad = true;
             generateAiBriefing(latestBriefingPayload, false);
           }
-        }, 1200);
+        }, 1000);
       }
     }
   }
