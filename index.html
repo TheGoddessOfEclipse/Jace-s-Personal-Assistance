@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jace's Personal Assistance 傑森的線上秘書</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-subtitle">JACE'S PERSONAL ASSISTANCE</span>
+        <h1>傑森的線上秘書</h1>
+      </div>
+      <div class="header-meta">
+        <span id="todayDateDisplay" class="today-pill"></span>
+        <div class="backup-actions">
+          <button type="button" id="exportDataBtn" class="btn-ghost" title="匯出資料備份">匯出備份</button>
+          <button type="button" id="importDataBtn" class="btn-ghost" title="還原資料備份">匯入還原</button>
+          <input type="file" id="importFileInput" accept=".json" hidden />
+        </div>
+      </div>
+    </div>
+
+    <nav class="main-nav">
+      <button type="button" class="nav-tab active" data-tab="briefing">
+        <span class="tab-num">00</span> Today's Briefing
+      </button>
+      <button type="button" class="nav-tab" data-tab="teaching">
+        <span class="tab-num">01</span> 教學進度平台
+      </button>
+      <button type="button" class="nav-tab" data-tab="todo">
+        <span class="tab-num">02</span> 待辦事項平台
+      </button>
+      <button type="button" class="nav-tab" data-tab="event">
+        <span class="tab-num">03</span> 活動提醒平台
+        <span id="eventAlertBadge" class="alert-dot hidden" title="有即將到來的提醒活動"></span>
+      </button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <!-- ==================== 首頁：Today's Briefing ==================== -->
+    <section id="tab-briefing" class="tab-panel active">
+      <!-- RPG 個人秘書對話區 -->
+      <div class="rpg-stage">
+        <div class="rpg-portrait-wrap">
+          <div id="rpgPortraitBox" class="rpg-portrait-frame" title="點擊上傳或更換秘書圖像（支援透明去背 PNG）">
+            <img id="rpgPortraitImg" class="rpg-portrait-img hidden" alt="個人秘書立繪" />
+            <div id="rpgPortraitPlaceholder" class="rpg-portrait-placeholder">
+              <span class="portrait-icon">✦</span>
+              <span>點擊放入<br />秘書圖像</span>
+            </div>
+            <div class="portrait-hover-tip">更換圖像</div>
+          </div>
+          <input type="file" id="rpgAvatarInput" accept="image/*" hidden />
+          <div class="portrait-tools">
+            <button type="button" id="rpgEditNameBtn" class="mini-link-btn">修改稱呼</button>
+            <button type="button" id="rpgResetAvatarBtn" class="mini-link-btn hidden">移除圖像</button>
+          </div>
+        </div>
+
+        <div class="rpg-dialogue-box">
+          <div class="rpg-nameplate-row">
+            <span id="rpgNameDisplay" class="rpg-nameplate">傑森的線上秘書</span>
+            <span class="rpg-sub-tag">TODAY'S BRIEFING</span>
+          </div>
+          <p id="rpgDialogueText" class="rpg-dialogue-text"></p>
+          <div id="rpgSummaryPills" class="rpg-summary-pills"></div>
+          <span class="rpg-caret" aria-hidden="true">▾</span>
+        </div>
+      </div>
+
+      <!-- 單一整合條列清單 -->
+      <article class="card briefing-unified-card">
+        <div class="briefing-unified-head">
+          <div>
+            <h2>Today's Briefing</h2>
+            <p class="hint">條列整合三大平台重點：勾選即同步更新狀態（待辦事項將進一步確認進度）</p>
+          </div>
+          <div class="briefing-quick-links">
+            <button type="button" class="btn-ghost-sm" data-jump-tab="teaching">教學進度</button>
+            <button type="button" class="btn-ghost-sm" data-jump-tab="todo">待辦事項</button>
+            <button type="button" class="btn-ghost-sm" data-jump-tab="event">活動提醒</button>
+          </div>
+        </div>
+
+        <ul id="briefingUnifiedList" class="unified-list"></ul>
+        <div id="briefingTodoHiddenHint" class="briefing-footnote hidden"></div>
+      </article>
+    </section>
+
+    <!-- ==================== 第一部分：教學進度平台 ==================== -->
+    <section id="tab-teaching" class="tab-panel">
+      <div class="class-bar card">
+        <div class="class-bar-left">
+          <span class="class-bar-label">班級切換</span>
+          <div id="classTabsContainer" class="class-tabs"></div>
+        </div>
+        <div class="class-bar-actions">
+          <button type="button" id="addClassBtn" class="btn-primary btn-sm">＋ 新增班級</button>
+          <button type="button" id="renameClassBtn" class="btn-ghost-sm">重新命名</button>
+          <button type="button" id="deleteClassBtn" class="btn-ghost-sm danger-outline">刪除班級</button>
+        </div>
+      </div>
+
+      <div class="panel-toolbar card">
+        <div class="toolbar-title">
+          <h2 id="activeClassHeading">進度表設定</h2>
+          <p class="hint">操作提示：拖曳或長按移位｜點一下標記完成｜點兩下編輯詳情｜點「設為今日」可釘選該班今日進度</p>
+        </div>
+        <div class="grid-config-form">
+          <label class="inline-field">
+            <span>總週數</span>
+            <input type="number" id="weeksInput" min="1" max="40" value="6" />
+          </label>
+          <label class="inline-field">
+            <span>每週堂數</span>
+            <input type="number" id="periodsInput" min="1" max="15" value="4" />
+          </label>
+          <button type="button" id="generateTableBtn" class="btn-primary">生成／更新表格</button>
+        </div>
+      </div>
+
+      <div class="teaching-layout">
+        <aside class="staging-sidebar">
+          <div class="card">
+            <h3>新增待排事項</h3>
+            <div class="form-stack">
+              <div class="field">
+                <label for="planName">事項名稱 *</label>
+                <input type="text" id="planName" placeholder="例如：L3 課文導讀、文法小考" />
+              </div>
+              <div class="field">
+                <label for="planType">性質</label>
+                <input type="text" id="planType" placeholder="例如：課文、文法、聽力、評量" />
+              </div>
+              <div class="field">
+                <label>標籤顏色</label>
+                <div class="color-picker-row">
+                  <div id="planColorPresets" class="color-swatches">
+                    <button type="button" class="swatch active" data-color="#DDE6D5" style="background:#DDE6D5" title="鼠尾草綠"></button>
+                    <button type="button" class="swatch" data-color="#F2E2CE" style="background:#F2E2CE" title="燕麥奶茶"></button>
+                    <button type="button" class="swatch" data-color="#EFD9D6" style="background:#EFD9D6" title="乾燥玫瑰"></button>
+                    <button type="button" class="swatch" data-color="#D8E3EA" style="background:#D8E3EA" title="霧霾藍"></button>
+                    <button type="button" class="swatch" data-color="#E4DCEB" style="background:#E4DCEB" title="薰衣草灰"></button>
+                    <button type="button" class="swatch" data-color="#EFE7C6" style="background:#EFE7C6" title="淡奶油黃"></button>
+                  </div>
+                  <input type="color" id="planColor" value="#DDE6D5" title="自訂顏色" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="planDesc">詳細備註（選填）</label>
+                <textarea id="planDesc" rows="2" placeholder="頁數、學習單、需準備教具等..."></textarea>
+              </div>
+              <button type="button" id="addPlanItemBtn" class="btn-primary full-width">加入待排區</button>
+            </div>
+          </div>
+
+          <div class="card staging-box">
+            <div class="staging-header">
+              <h3>待排區</h3>
+              <span id="stagingCount" class="count-pill">0</span>
+            </div>
+            <div id="stagingList" class="drop-zone staging-list" data-drop-type="staging"></div>
+          </div>
+        </aside>
+
+        <div class="table-section card">
+          <div class="table-wrapper">
+            <table class="progress-table">
+              <thead>
+                <tr>
+                  <th class="col-week">週次</th>
+                  <th class="col-period">節次</th>
+                  <th class="col-content">教學內容（將待排事項拖曳至此）</th>
+                </tr>
+              </thead>
+              <tbody id="progressTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 第二部分：待辦事項平台 ==================== -->
+    <section id="tab-todo" class="tab-panel">
+      <div class="two-col-layout">
+        <aside class="card form-panel">
+          <div class="section-head">
+            <h2>新增待辦事項</h2>
+            <button type="button" id="openSourceModalBtn" class="btn-ghost-sm">⚙ 管理來源</button>
+          </div>
+          <div class="form-stack">
+            <div class="field">
+              <label for="todoDate">輸入日期</label>
+              <input type="date" id="todoDate" />
+            </div>
+            <div class="field">
+              <label for="todoTitle">事項名稱 *</label>
+              <input type="text" id="todoTitle" placeholder="例如：填報校園環境消毒紀錄" />
+            </div>
+            <div class="field">
+              <label for="todoSource">任務來源</label>
+              <select id="todoSource"></select>
+            </div>
+            <div class="field">
+              <label for="todoContent">具體事項內容</label>
+              <textarea id="todoContent" rows="3" placeholder="詳細執行步驟、對象或繳交格式..."></textarea>
+            </div>
+            <div class="field">
+              <label for="todoNote">備註</label>
+              <textarea id="todoNote" rows="2" placeholder="相關聯絡人、文件路徑、截止細節..."></textarea>
+            </div>
+            <button type="button" id="addTodoBtn" class="btn-primary full-width">新增待辦</button>
+          </div>
+        </aside>
+
+        <div class="list-panel">
+          <div class="card">
+            <div class="list-controls">
+              <div class="sub-tabs">
+                <button type="button" class="sub-tab active" data-todo-view="active">
+                  進行中 <span id="todoActiveCount" class="count-pill">0</span>
+                </button>
+                <button type="button" class="sub-tab" data-todo-view="history">
+                  歷史備查 <span id="todoHistoryCount" class="count-pill">0</span>
+                </button>
+              </div>
+              <div class="filters">
+                <select id="todoFilterSource">
+                  <option value="all">全部來源</option>
+                </select>
+                <select id="todoFilterStatus">
+                  <option value="all">全部狀態</option>
+                  <option value="not_started">未開始</option>
+                  <option value="today_done">今日進度已完成</option>
+                </select>
+                <input type="text" id="todoSearchInput" placeholder="搜尋關鍵字..." />
+              </div>
+            </div>
+
+            <div id="todoActiveList" class="item-list"></div>
+            <div id="todoHistoryList" class="item-list hidden"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== 第三部分：活動提醒平台 ==================== -->
+    <section id="tab-event" class="tab-panel">
+      <div class="two-col-layout">
+        <aside class="card form-panel">
+          <div class="section-head">
+            <h2>新增活動提醒</h2>
+          </div>
+          <div class="form-stack">
+            <div class="field">
+              <label for="eventName">活動名稱 *</label>
+              <input type="text" id="eventName" placeholder="例如：全校登革熱防治宣導、英語朗讀比賽" />
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="eventDate">發生日期 *</label>
+                <input type="date" id="eventDate" />
+              </div>
+              <div class="field">
+                <label for="eventRemindDate">提醒日期 *</label>
+                <input type="date" id="eventRemindDate" />
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="eventTime">活動時間</label>
+                <input type="text" id="eventTime" placeholder="例如：09:00 - 11:30" />
+              </div>
+              <div class="field">
+                <label for="eventLocation">活動地點</label>
+                <input type="text" id="eventLocation" placeholder="例如：活動中心二樓" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="eventNote">備註</label>
+              <textarea id="eventNote" rows="3" placeholder="需攜帶物品、流程重點、負責窗口..."></textarea>
+            </div>
+            <button type="button" id="addEventBtn" class="btn-primary full-width">加入活動提醒</button>
+          </div>
+        </aside>
+
+        <div class="list-panel">
+          <div class="card">
+            <div class="list-controls">
+              <div class="sub-tabs">
+                <button type="button" class="sub-tab active" data-event-view="upcoming">
+                  即將到來 <span id="eventUpcomingCount" class="count-pill">0</span>
+                </button>
+                <button type="button" class="sub-tab" data-event-view="history">
+                  歷史備查 <span id="eventHistoryCount" class="count-pill">0</span>
+                </button>
+              </div>
+              <div class="filters">
+                <input type="text" id="eventSearchInput" placeholder="搜尋活動名稱或地點..." />
+              </div>
+            </div>
+            <p class="hint small-hint">※ 發生日期已過期、或於首頁勾選「已處理」的活動，皆會歸檔至「歷史備查」。</p>
+
+            <div id="eventUpcomingList" class="item-list"></div>
+            <div id="eventHistoryList" class="item-list hidden"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== Modal 1：教學事項詳情與編輯 ==================== -->
+  <div id="planModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>教學事項詳情</h3>
+        <button type="button" class="modal-close" data-close="planModal">&times;</button>
+      </div>
+      <div class="modal-body form-stack">
+        <input type="hidden" id="editPlanId" />
+        <div class="field">
+          <label for="editPlanName">事項名稱</label>
+          <input type="text" id="editPlanName" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="editPlanType">性質</label>
+            <input type="text" id="editPlanType" />
+          </div>
+          <div class="field">
+            <label for="editPlanColor">顏色</label>
+            <input type="color" id="editPlanColor" class="full-color-input" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="editPlanDesc">詳細備註</label>
+          <textarea id="editPlanDesc" rows="3"></textarea>
+        </div>
+        <div class="field checkbox-field">
+          <label>
+            <input type="checkbox" id="editPlanCompleted" />
+            <span>標記為已完成</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer space-between">
+        <button type="button" id="deletePlanItemBtn" class="btn-danger">刪除事項</button>
+        <div class="btn-group">
+          <button type="button" class="btn-ghost" data-close="planModal">取消</button>
+          <button type="button" id="savePlanEditBtn" class="btn-primary">儲存變更</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 2：新增／重命名班級 ==================== -->
+  <div id="classModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3 id="classModalTitle">新增班級</h3>
+        <button type="button" class="modal-close" data-close="classModal">&times;</button>
+      </div>
+      <div class="modal-body form-stack">
+        <input type="hidden" id="classModalMode" value="add" />
+        <div class="field">
+          <label for="classNameInput">班級名稱 *</label>
+          <input type="text" id="classNameInput" placeholder="例如：八年甲班、英文補強班" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="classModal">取消</button>
+        <button type="button" id="saveClassModalBtn" class="btn-primary">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 3：任務來源管理 ==================== -->
+  <div id="sourceModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>管理任務來源與顏色</h3>
+        <button type="button" class="modal-close" data-close="sourceModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="add-source-row">
+          <input type="text" id="newSourceName" placeholder="輸入新來源名稱（如：英語領域）" />
+          <input type="color" id="newSourceColor" value="#6C8474" />
+          <button type="button" id="addSourceBtn" class="btn-primary">新增</button>
+        </div>
+        <div id="sourceManagerList" class="source-manager-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-primary" data-close="sourceModal">完成</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 4：編輯待辦事項 ==================== -->
+  <div id="todoEditModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>編輯待辦事項</h3>
+        <button type="button" class="modal-close" data-close="todoEditModal">&times;</button>
+      </div>
+      <div class="modal-body form-stack">
+        <input type="hidden" id="editTodoId" />
+        <div class="field-row">
+          <div class="field">
+            <label for="editTodoDate">輸入日期</label>
+            <input type="date" id="editTodoDate" />
+          </div>
+          <div class="field">
+            <label for="editTodoSource">任務來源</label>
+            <select id="editTodoSource"></select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="editTodoTitle">事項名稱</label>
+          <input type="text" id="editTodoTitle" />
+        </div>
+        <div class="field">
+          <label for="editTodoContent">具體事項內容</label>
+          <textarea id="editTodoContent" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label for="editTodoNote">備註</label>
+          <textarea id="editTodoNote" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="todoEditModal">取消</button>
+        <button type="button" id="saveTodoEditBtn" class="btn-primary">儲存變更</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 5：編輯活動提醒 ==================== -->
+  <div id="eventEditModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>編輯活動資訊</h3>
+        <button type="button" class="modal-close" data-close="eventEditModal">&times;</button>
+      </div>
+      <div class="modal-body form-stack">
+        <input type="hidden" id="editEventId" />
+        <div class="field">
+          <label for="editEventName">活動名稱</label>
+          <input type="text" id="editEventName" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="editEventDate">發生日期</label>
+            <input type="date" id="editEventDate" />
+          </div>
+          <div class="field">
+            <label for="editEventRemindDate">提醒日期</label>
+            <input type="date" id="editEventRemindDate" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="editEventTime">活動時間</label>
+            <input type="text" id="editEventTime" />
+          </div>
+          <div class="field">
+            <label for="editEventLocation">活動地點</label>
+            <input type="text" id="editEventLocation" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="editEventNote">備註</label>
+          <textarea id="editEventNote" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="eventEditModal">取消</button>
+        <button type="button" id="saveEventEditBtn" class="btn-primary">儲存變更</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 6：首頁待辦處理詢問 ==================== -->
+  <div id="todoResolveModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>確認待辦處理進度</h3>
+        <button type="button" class="modal-close" data-close="todoResolveModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resolveTodoId" />
+        <p class="resolve-question">請問「<strong id="resolveTodoTitleDisplay"></strong>」目前的完成狀態是？</p>
+        <div class="resolve-options">
+          <button type="button" id="resolveTodayDoneBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">今日進度已完成</span>
+            <span class="resolve-opt-desc">今日不再於 Today's Briefing 顯示，明日會自動恢復提醒。</span>
+          </button>
+          <button type="button" id="resolveCompleteBtn" class="resolve-option-btn primary">
+            <span class="resolve-opt-title">✓ 全部已完成</span>
+            <span class="resolve-opt-desc">此事項已結案，立即撤除並納入歷史備查。</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="todoResolveModal">先不要，取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="toast-container"></div>
+  <script src="script.js"></script>
+</body>
+</html>
