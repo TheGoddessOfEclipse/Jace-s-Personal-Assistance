@@ -2248,3 +2248,57 @@ input[type="color"] {
     min-height: auto;
   }
 }
+
+/* ==================== 修正小日曆在白底卡片上的字體顏色 ==================== */
+.event-calendar-card {
+  color: var(--ink-primary);
+}
+
+.cal-header h3 {
+  color: var(--ink-primary);
+}
+
+.cal-nav button {
+  color: var(--ink-secondary);
+  border-color: var(--border-strong);
+  background: var(--bg-card);
+}
+
+.cal-nav button:hover {
+  color: var(--ink-primary);
+  border-color: var(--accent);
+}
+
+.cal-weekdays {
+  color: var(--ink-secondary);
+  font-weight: 500;
+}
+
+.cal-day {
+  color: var(--ink-primary);
+}
+
+.cal-day:hover:not(.is-empty) {
+  background: var(--bg-soft);
+  color: var(--ink-primary);
+}
+
+.cal-day.has-upcoming {
+  color: var(--terracotta);
+}
+
+.cal-day.has-past-only {
+  color: var(--ink-secondary);
+}
+
+.cal-day.is-selected {
+  color: #FFFFFF !important;
+}
+
+.cal-legend {
+  color: var(--ink-secondary);
+}
+
+.cal-selected-date {
+  color: var(--ink-primary);
+}
