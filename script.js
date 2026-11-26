@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = 'teacher_admin_journal_v1';
 
-  // ==================== Firebase 設定（請替換為你的專案設定） ====================
+  // ==================== Firebase 設定（共用 Jace's Teaching Lab） ====================
   const firebaseConfig = {
     apiKey: "AIzaSyAp9o7K0rBQgwSMg58e4C1FXy2UZjfCSv4",
     authDomain: "jace-s-teaching-lab.firebaseapp.com",
@@ -12,11 +12,16 @@
     appId: "1:222352360644:web:693d06971123e5afbcf591"
   };
 
-  // 資料存放的雲端節點路徑（若要與其他專案共用同一個 Firebase，改這裡即可區隔）
+  // 請填入允許登入此線上秘書的 Gmail（小寫皆可）
+  const ALLOWED_EMAILS = [
+    "你的Gmail@gmail.com"
+  ];
+
+  // 本平台獨立的雲端路徑，不影響 Jace's Teaching Lab 原有資料
   const FIREBASE_PATH = 'jace_personal_assistant/state';
 
   let dbRef = null;
-  let isFirebaseReady = false;
+  let isCloudConnected = false;
   let saveTimer = null;
 
   function setSyncStatus(statusType, text) {
@@ -24,6 +29,18 @@
     if (!badge) return;
     badge.className = `sync-pill ${statusType}`;
     badge.textContent = text;
+  }
+
+  function showAuthError(msg) {
+    const el = document.getElementById('authErrorMsg');
+    if (!el) return;
+    if (!msg) {
+      el.classList.add('hidden');
+      el.textContent = '';
+    } else {
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
   }
 
   // ==================== 初始預設資料 ====================
@@ -234,9 +251,9 @@
   let currentTodoView = 'active';
   let currentEventView = 'upcoming';
 
-  // ==================== 儲存與 Firebase 即時同步 ====================
+  // ==================== Firebase Auth 與即時同步 ====================
   function pushToCloud() {
-    if (!isFirebaseReady || !dbRef) return;
+    if (!isCloudConnected || !dbRef) return;
     setSyncStatus('syncing', '↻ 同步中...');
     const payload = JSON.parse(JSON.stringify(state));
     dbRef.set(payload)
@@ -245,8 +262,8 @@
       })
       .catch((err) => {
         console.error('Firebase 寫入失敗:', err);
-        setSyncStatus('error', '⚠️ 同步失敗');
-        showToast('寫入雲端失敗，請檢查網路或 Firebase 資料庫規則');
+        setSyncStatus('error', '⚠️ 權限或連線錯誤');
+        showToast('寫入雲端失敗，請確認 Database 規則是否已允許你的 Gmail');
       });
   }
 
@@ -257,67 +274,122 @@
       showToast('本機快取空間已滿，建議縮小秘書圖像檔案');
     }
 
-    if (isFirebaseReady && dbRef) {
+    if (isCloudConnected && dbRef) {
       clearTimeout(saveTimer);
       saveTimer = setTimeout(pushToCloud, 180);
     }
   }
 
-  function initFirebase() {
-    const isConfigured =
-      typeof firebase !== 'undefined' &&
-      firebaseConfig.databaseURL &&
-      !firebaseConfig.databaseURL.includes('貼上你的') &&
-      !firebaseConfig.apiKey.includes('貼上你的');
+  function startCloudSync() {
+    if (dbRef) dbRef.off();
+    dbRef = firebase.database().ref(FIREBASE_PATH);
+    isCloudConnected = true;
+    setSyncStatus('syncing', '連線雲端中...');
 
-    if (!isConfigured) {
-      setSyncStatus('local', '本機模式（未設 Firebase）');
+    dbRef.on(
+      'value',
+      (snapshot) => {
+        const cloudData = snapshot.val();
+        if (!cloudData) {
+          pushToCloud();
+          return;
+        }
+        state = migrateAndNormalizeState(cloudData);
+        const dailyChanged = normalizeDailyStates(state);
+
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch {}
+
+        renderAll();
+        setSyncStatus('synced', '☁️ 雲端已同步');
+        if (dailyChanged) pushToCloud();
+      },
+      (err) => {
+        console.error('Firebase 讀取錯誤:', err);
+        setSyncStatus('error', '⚠️ 雲端權限不足');
+        showToast('讀取雲端失敗：請確認 Database 規則中的 Email 與登入帳號一致');
+      }
+    );
+  }
+
+  function stopCloudSync() {
+    if (dbRef) {
+      dbRef.off();
+      dbRef = null;
+    }
+    isCloudConnected = false;
+  }
+
+  function initFirebaseAuth() {
+    if (typeof firebase === 'undefined') {
+      showAuthError('Firebase SDK 載入失敗，請確認網路連線。');
       return;
     }
 
-    try {
-      if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-      }
-      const db = firebase.database();
-      dbRef = db.ref(FIREBASE_PATH);
-      isFirebaseReady = true;
-      setSyncStatus('syncing', '連線雲端中...');
-
-      dbRef.on(
-        'value',
-        (snapshot) => {
-          const cloudData = snapshot.val();
-          if (!cloudData) {
-            // 雲端尚無資料時，自動把目前本機資料上傳初始化
-            pushToCloud();
-            return;
-          }
-
-          state = migrateAndNormalizeState(cloudData);
-          const dailyChanged = normalizeDailyStates(state);
-
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-          } catch {}
-
-          renderAll();
-          setSyncStatus('synced', '☁️ 雲端已同步');
-
-          if (dailyChanged) {
-            pushToCloud();
-          }
-        },
-        (err) => {
-          console.error('Firebase 讀取錯誤:', err);
-          setSyncStatus('error', '⚠️ 雲端連線失敗');
-          showToast('無法讀取 Firebase，請確認資料庫規則與網址是否正確');
-        }
-      );
-    } catch (err) {
-      console.error('Firebase 初始化錯誤:', err);
-      setSyncStatus('error', '⚠️ Firebase 設定有誤');
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
     }
+
+    const auth = firebase.auth();
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const authGate = document.getElementById('authGate');
+    const userControls = document.getElementById('userControls');
+    const userEmailDisplay = document.getElementById('userEmailDisplay');
+
+    // 點擊 Google 登入
+    document.getElementById('googleLoginBtn').addEventListener('click', () => {
+      showAuthError('');
+      auth.signInWithPopup(provider).catch((err) => {
+        console.error('Google 登入錯誤:', err);
+        if (err.code === 'auth/unauthorized-domain') {
+          showAuthError('此網址尚未加入授權網域，請到 Firebase Console → Authentication → Settings → Authorized domains 新增目前網址。');
+        } else if (err.code === 'auth/operation-not-supported-in-this-environment') {
+          showAuthError('請透過 VS Code 的 Live Server（或 GitHub Pages）開啟，不能直接雙擊 HTML 檔案進行 Google 登入。');
+        } else if (err.code !== 'auth/popup-closed-by-user') {
+          showAuthError(`登入失敗：${err.message}`);
+        }
+      });
+    });
+
+    // 點擊登出
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      if (!confirm('確定要登出嗎？')) return;
+      stopCloudSync();
+      auth.signOut();
+    });
+
+    // 監聽登入狀態
+    auth.onAuthStateChanged((user) => {
+      if (!user) {
+        stopCloudSync();
+        authGate.classList.remove('hidden');
+        userControls.classList.add('hidden');
+        setSyncStatus('local', '等待登入');
+        return;
+      }
+
+      // 檢查白名單（若尚未修改預設文字則先放行，方便初次測試）
+      const activeWhitelist = ALLOWED_EMAILS
+        .map(e => e.trim().toLowerCase())
+        .filter(e => e && !e.includes('你的gmail'));
+
+      const userEmail = (user.email || '').toLowerCase();
+      if (activeWhitelist.length > 0 && !activeWhitelist.includes(userEmail)) {
+        auth.signOut();
+        showAuthError(`帳號 ${user.email} 不在授權清單內，請改用授權的 Google 帳號登入。`);
+        return;
+      }
+
+      showAuthError('');
+      authGate.classList.add('hidden');
+      userControls.classList.remove('hidden');
+      userEmailDisplay.textContent = user.email;
+      userEmailDisplay.title = user.email;
+
+      renderAll();
+      startCloudSync();
+    });
   }
 
   function getActiveClass() {
@@ -463,7 +535,6 @@
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
-          // 縮放至 400px 內，保留透明 PNG 並確保 Firebase 同步快速
           const maxSize = 400;
           let { width, height } = img;
           if (width > maxSize || height > maxSize) {
@@ -593,7 +664,6 @@
     let teachingPending = 0;
     let rowCount = 0;
 
-    // 1. 教學進度（各班今日進度 + 下堂課進度）
     state.teaching.classes.forEach(cls => {
       const { todaySlot, nextSlot } = getClassLessonBriefing(cls);
 
@@ -671,7 +741,6 @@
       }
     });
 
-    // 2. 活動提醒（七日內）
     const upcoming7Days = state.events
       .filter(e => !e.archived && e.date >= today && diffDays(today, e.date) <= 7)
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -718,7 +787,6 @@
       listEl.appendChild(li);
     });
 
-    // 3. 待辦事項（全列，排除今日已標記「今日進度已完成」者）
     const visibleTodos = state.todos.filter(
       t => t.status !== 'completed' && !(t.status === 'today_done' && t.todayDoneDate === today)
     );
@@ -1741,6 +1809,5 @@
   initTeaching();
   initTodo();
   initEvents();
-  renderAll();
-  initFirebase();
+  initFirebaseAuth();
 })();
