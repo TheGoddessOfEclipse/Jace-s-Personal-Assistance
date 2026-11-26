@@ -1084,16 +1084,28 @@
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     try {
+      const generationConfig = {
+        temperature: 0.75
+      };
+      if (model.includes('2.5')) {
+        generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      }
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig
-          })
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig
+        })
       });
 
       const data = await res.json();
+      console.log('AI 回傳狀態:', {
+        model,
+        finishReason: data?.candidates?.[0]?.finishReason,
+        usage: data?.usageMetadata
+      });
       if (!res.ok) {
         throw new Error(data?.error?.message || `HTTP ${res.status}`);
       }
