@@ -143,6 +143,68 @@
     }, 2300);
   }
 
+  // ==================== 共用建立副本函式 ====================
+  function duplicateTeachingItemToStaging(cls, item) {
+    if (!cls || !item) return;
+    cls.items.push({
+      id: uid('plan'),
+      name: item.name,
+      type: item.type || '',
+      color: item.color || '#DDE6D5',
+      desc: item.desc || '',
+      completed: false,
+      completedAt: null,
+      location: { type: 'staging' }
+    });
+    saveState();
+    renderTeaching();
+    renderBriefing();
+    showToast(`已建立副本「${item.name}」至「${cls.name}」待排區`);
+  }
+
+  function duplicateTodoItem(todo) {
+    if (!todo) return;
+    const newTodo = {
+      id: uid('todo'),
+      date: getTodayStr(),
+      title: todo.title,
+      sourceId: todo.sourceId,
+      content: todo.content || '',
+      note: todo.note || '',
+      status: 'not_started',
+      todayDoneDate: null,
+      lastWorkedDate: null,
+      completedAt: null
+    };
+    state.todos.unshift(newTodo);
+    saveState();
+    renderTodos();
+    renderBriefing();
+    showToast(`已建立待辦副本「${newTodo.title}」至進行中清單`);
+  }
+
+  function duplicateEventItem(evt) {
+    if (!evt) return;
+    const today = getTodayStr();
+    const newEvt = {
+      id: uid('evt'),
+      name: evt.name,
+      date: today,
+      remindDate: today,
+      time: evt.time || '',
+      location: evt.location || '',
+      note: evt.note || '',
+      archived: false,
+      archivedAt: null
+    };
+    state.events.push(newEvt);
+    saveState();
+    renderEvents();
+    renderBriefing();
+    showToast(`已建立活動副本「${newEvt.name}」，請設定新的活動日期`);
+    openEventEditModal(newEvt);
+  }
+
   // ==================== 資料載入、Firebase 空陣列防護與跨日處理 ====================
   function migrateAndNormalizeState(parsed) {
     const base = createDefaultState();
@@ -526,7 +588,6 @@
 
   // ==================== 首頁：RPG 個人秘書、整合條列與綜合歷史紀錄 ====================
   function initBriefing() {
-    // 切換 今日重點 / 綜合歷史紀錄
     document.querySelectorAll('[data-briefing-view]').forEach(btn => {
       btn.addEventListener('click', () => {
         currentBriefingView = btn.dataset.briefingView;
@@ -539,7 +600,6 @@
       document.getElementById(id).addEventListener('input', renderBriefingHistory);
     });
 
-    // RPG 秘書立繪上傳
     const portraitBox = document.getElementById('rpgPortraitBox');
     const avatarInput = document.getElementById('rpgAvatarInput');
 
@@ -630,7 +690,7 @@
     document.getElementById('briefingHistoryWrap').classList.toggle('hidden', !isHistory);
     document.getElementById('briefingHistoryFilters').classList.toggle('hidden', !isHistory);
     document.getElementById('briefingSubHint').textContent = isHistory
-      ? '彙整三大平台所有已完成教學事項、結案待辦與已結束／歸檔活動，依日期由近至遠排列'
+      ? '彙整三大平台所有已完成教學事項、結案待辦與已結束／歸檔活動，可隨時建立副本重複使用'
       : '條列整合三大平台重點：勾選即同步更新狀態（待辦事項將進一步確認進度）';
   }
 
@@ -743,9 +803,7 @@
         });
       });
 
-    // 依時間由近至遠排序
     records.sort((a, b) => b.sortDate.localeCompare(a.sortDate));
-
     document.getElementById('briefingHistoryCount').textContent = records.length;
 
     const filtered = records.filter(rec => {
@@ -767,7 +825,7 @@
       li.className = 'unified-row is-history-row';
 
       if (rec.platform === 'teaching') {
-        const { item, locText } = rec;
+        const { cls, item, locText } = rec;
         li.innerHTML = `
           <div class="unified-body">
             <div class="unified-main-line">
@@ -783,9 +841,13 @@
             ${item.desc ? `<div class="unified-sub-line">備註：${escapeHtml(item.desc)}</div>` : ''}
           </div>
           <div class="history-row-actions">
+            <button type="button" class="text-btn" data-copy-plan>建立副本</button>
             <button type="button" class="text-btn" data-restore-plan>恢復未完成</button>
           </div>
         `;
+        li.querySelector('[data-copy-plan]').addEventListener('click', () => {
+          duplicateTeachingItemToStaging(cls, item);
+        });
         li.querySelector('[data-restore-plan]').addEventListener('click', () => {
           item.completed = false;
           item.completedAt = null;
@@ -814,9 +876,13 @@
             ${subParts.length ? `<div class="unified-sub-line">${escapeHtml(subParts.join('｜'))}</div>` : ''}
           </div>
           <div class="history-row-actions">
+            <button type="button" class="text-btn" data-copy-todo>建立副本</button>
             <button type="button" class="text-btn" data-restore-todo>復原至待辦</button>
           </div>
         `;
+        li.querySelector('[data-copy-todo]').addEventListener('click', () => {
+          duplicateTodoItem(todo);
+        });
         li.querySelector('[data-restore-todo]').addEventListener('click', () => {
           todo.status = 'not_started';
           todo.completedAt = null;
@@ -846,9 +912,13 @@
             ${metaParts.length ? `<div class="unified-sub-line">${escapeHtml(metaParts.join('｜'))}</div>` : ''}
           </div>
           <div class="history-row-actions">
+            <button type="button" class="text-btn" data-copy-evt>建立副本</button>
             ${canRestore ? '<button type="button" class="text-btn" data-restore-evt>復原活動</button>' : ''}
           </div>
         `;
+        li.querySelector('[data-copy-evt]').addEventListener('click', () => {
+          duplicateEventItem(evt);
+        });
         const restoreBtn = li.querySelector('[data-restore-evt]');
         if (restoreBtn) {
           restoreBtn.addEventListener('click', () => {
@@ -1106,7 +1176,6 @@
   }
 
   function initTeaching() {
-    // 多選模式切換與批次操作
     document.getElementById('toggleMultiSelectBtn').addEventListener('click', () => {
       setMultiSelectMode(!isMultiSelectMode);
     });
@@ -1139,7 +1208,6 @@
       renderTeaching();
     });
 
-    // 新增／重新命名／刪除班級
     document.getElementById('addClassBtn').addEventListener('click', () => {
       document.getElementById('classModalMode').value = 'add';
       document.getElementById('classModalTitle').textContent = '新增班級';
@@ -1269,7 +1337,6 @@
       showToast(`已加入「${cls.name}」待排區`);
     });
 
-    // 編輯視窗：儲存、複製、刪除
     document.getElementById('savePlanEditBtn').addEventListener('click', () => {
       const cls = getActiveClass();
       const id = document.getElementById('editPlanId').value;
@@ -1340,7 +1407,6 @@
       ` : ''}
     `;
 
-    // 快速編輯與單筆複製按鈕（阻擋冒泡避免誤觸拖曳或切換完成）
     const editBtn = chip.querySelector('[data-chip-edit]');
     const copyBtn = chip.querySelector('[data-chip-copy]');
 
@@ -1367,7 +1433,6 @@
   let clickTracker = { id: null, timer: null };
 
   function attachChipInteractions(chip, itemId) {
-    // 多選模式下：單純點擊切換選取，停用拖曳與完成切換
     if (isMultiSelectMode) {
       chip.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1527,13 +1592,11 @@
     const today = getTodayStr();
     const { todaySlot, isPinned } = getClassLessonBriefing(cls);
 
-    // 清理已不存在於目前班級的選取 ID
     const validIds = new Set(cls.items.map(i => i.id));
     Array.from(selectedPlanIds).forEach(id => {
       if (!validIds.has(id)) selectedPlanIds.delete(id);
     });
 
-    // 多選工具列狀態同步
     const batchBar = document.getElementById('batchActionBar');
     const toggleBtn = document.getElementById('toggleMultiSelectBtn');
     const stagingMultiBtn = document.getElementById('stagingMultiBtn');
@@ -1545,7 +1608,6 @@
     stagingMultiBtn.textContent = isMultiSelectMode ? '退出多選' : '☑ 多選';
     document.getElementById('batchSelectedCount').textContent = selectedPlanIds.size;
 
-    // 複製目標班級下拉選單
     const targetSelect = document.getElementById('batchTargetClassSelect');
     const prevTarget = targetSelect.value;
     targetSelect.innerHTML = state.teaching.classes
@@ -1553,7 +1615,6 @@
       .join('');
     targetSelect.value = state.teaching.classes.some(c => c.id === prevTarget) ? prevTarget : cls.id;
 
-    // 班級切換按鈕
     const tabsWrap = document.getElementById('classTabsContainer');
     tabsWrap.innerHTML = '';
     state.teaching.classes.forEach(c => {
@@ -1574,7 +1635,6 @@
     document.getElementById('weeksInput').value = cls.weeks;
     document.getElementById('periodsInput').value = cls.periods;
 
-    // 待排區
     const stagingList = document.getElementById('stagingList');
     stagingList.innerHTML = '';
     const stagingItems = cls.items.filter(i => i.location.type === 'staging');
@@ -1586,7 +1646,6 @@
       stagingItems.forEach(item => stagingList.appendChild(createPlanChip(item)));
     }
 
-    // 進度表
     const tbody = document.getElementById('progressTableBody');
     tbody.innerHTML = '';
 
@@ -1852,6 +1911,7 @@
               <div class="card-title" style="margin-top:6px;">${escapeHtml(todo.title)}</div>
             </div>
             <div class="icon-actions">
+              <button type="button" class="text-btn" data-copy="${todo.id}">建立副本</button>
               <button type="button" class="text-btn" data-edit="${todo.id}">編輯</button>
               <button type="button" class="text-btn danger" data-del="${todo.id}">刪除</button>
             </div>
@@ -1887,6 +1947,7 @@
           });
         });
 
+        card.querySelector('[data-copy]').addEventListener('click', () => duplicateTodoItem(todo));
         card.querySelector('[data-edit]').addEventListener('click', () => openTodoEditModal(todo));
         card.querySelector('[data-del]').addEventListener('click', () => {
           if (!confirm(`確定刪除「${todo.title}」？`)) return;
@@ -1923,6 +1984,7 @@
               <div class="card-title" style="margin-top:6px;">${escapeHtml(todo.title)}</div>
             </div>
             <div class="icon-actions">
+              <button type="button" class="text-btn" data-copy="${todo.id}">建立副本</button>
               <button type="button" class="text-btn" data-restore="${todo.id}">復原至待辦</button>
               <button type="button" class="text-btn danger" data-del="${todo.id}">永久刪除</button>
             </div>
@@ -1930,6 +1992,8 @@
           ${todo.content ? `<div class="card-body">${escapeHtml(todo.content)}</div>` : ''}
           ${todo.note ? `<div class="card-note">備註：${escapeHtml(todo.note)}</div>` : ''}
         `;
+
+        card.querySelector('[data-copy]').addEventListener('click', () => duplicateTodoItem(todo));
 
         card.querySelector('[data-restore]').addEventListener('click', () => {
           todo.status = 'not_started';
@@ -2105,6 +2169,7 @@
               <div class="card-title" style="margin-top:6px;">${escapeHtml(evt.name)}</div>
             </div>
             <div class="icon-actions">
+              <button type="button" class="text-btn" data-copy="${evt.id}">建立副本</button>
               ${!isPast ? `<button type="button" class="text-btn" data-archive="${evt.id}">標記已處理</button>` : ''}
               ${isPast && evt.archived && evt.date >= today ? `<button type="button" class="text-btn" data-unarchive="${evt.id}">復原</button>` : ''}
               <button type="button" class="text-btn" data-edit="${evt.id}">編輯</button>
@@ -2118,6 +2183,8 @@
           </div>
           ${evt.note ? `<div class="card-note">備註：${escapeHtml(evt.note)}</div>` : ''}
         `;
+
+        card.querySelector('[data-copy]').addEventListener('click', () => duplicateEventItem(evt));
 
         const archiveBtn = card.querySelector('[data-archive]');
         if (archiveBtn) {
