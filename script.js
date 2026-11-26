@@ -14,22 +14,35 @@
 
   // 請填入允許登入此線上秘書的 Gmail
   const ALLOWED_EMAILS = [
-    "你的Gmail@gmail.com"
+    "jwls0202@gmail.com"
   ];
 
   // 本平台獨立的雲端路徑，不影響 Jace's Teaching Lab 原有資料
   const FIREBASE_PATH = 'jace_personal_assistant/state';
 
+  const DEFAULT_SECRETARY_PERSONA =
+    '你是一位幹練、溫暖又帶點機智的個人秘書（RPG 夥伴風格），協助身為國中英文老師兼衛生組長的 Jace 掌握每日節奏。請用繁體中文、自然口語的 2～4 句話（約 80～130 字，不要使用條列符號或 Markdown 星號）彙報今天最該優先處理的事項：主動點出近期急迫活動的時間與地點、今日課堂重點或備註，以及關鍵待辦，最後給一句簡短提振士氣的話。';
+
   let dbRef = null;
   let isCloudConnected = false;
   let saveTimer = null;
 
-  // UI 狀態
+  // UI 與 AI 狀態
   let currentBriefingView = 'today'; // 'today' | 'history'
   let currentTodoView = 'active';
   let currentEventView = 'upcoming';
   let isMultiSelectMode = false;
   let selectedPlanIds = new Set();
+
+  let isGeneratingAiBriefing = false;
+  let lastFailedBriefingHash = '';
+  let latestBriefingPayload = null;
+  let aiAutoTimer = null;
+
+  function on(id, eventName, handler) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(eventName, handler);
+  }
 
   function setSyncStatus(statusType, text) {
     const badge = document.getElementById('syncStatusBadge');
@@ -67,7 +80,12 @@
     return {
       secretary: {
         name: '傑森的線上秘書',
-        avatar: ''
+        avatar: '',
+        apiKey: '',
+        model: 'gemini-2.5-flash',
+        persona: DEFAULT_SECRETARY_PERSONA,
+        lastBriefingText: '',
+        lastBriefingHash: ''
       },
       teaching: {
         activeClassId: firstClass.id,
@@ -105,6 +123,15 @@
     return `${y}-${m}-${d}`;
   }
 
+  function addDays(dateStr, days) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + days);
+    const ny = dt.getFullYear();
+    const nm = String(dt.getMonth() + 1).padStart(2, '0');
+    const nd = String(dt.getDate()).padStart(2, '0');
+    return `${ny}-${nm}-${nd}`;
+  }
+
   function diffDays(dateStrA, dateStrB) {
     const a = new Date(`${dateStrA}T00:00:00`);
     const b = new Date(`${dateStrB}T00:00:00`);
@@ -132,6 +159,7 @@
 
   function showToast(msg) {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
     const el = document.createElement('div');
     el.className = 'toast';
     el.textContent = msg;
@@ -195,7 +223,8 @@
       location: evt.location || '',
       note: evt.note || '',
       archived: false,
-      archivedAt: null
+      archivedAt: null,
+      snoozeUntil: null
     };
     state.events.push(newEvt);
     saveState();
@@ -254,7 +283,12 @@
 
     const secretary = {
       name: (parsed.secretary && parsed.secretary.name) || base.secretary.name,
-      avatar: (parsed.secretary && parsed.secretary.avatar) || ''
+      avatar: (parsed.secretary && parsed.secretary.avatar) || '',
+      apiKey: (parsed.secretary && parsed.secretary.apiKey) || '',
+      model: (parsed.secretary && parsed.secretary.model) || 'gemini-2.5-flash',
+      persona: (parsed.secretary && parsed.secretary.persona) || DEFAULT_SECRETARY_PERSONA,
+      lastBriefingText: (parsed.secretary && parsed.secretary.lastBriefingText) || '',
+      lastBriefingHash: (parsed.secretary && parsed.secretary.lastBriefingHash) || ''
     };
 
     const rawSources = toArray(parsed.sources);
@@ -281,7 +315,8 @@
       location: e.location || '',
       note: e.note || '',
       archived: !!e.archived,
-      archivedAt: e.archivedAt || null
+      archivedAt: e.archivedAt || null,
+      snoozeUntil: e.snoozeUntil || null
     }));
 
     return { secretary, teaching, sources, todos, events };
@@ -301,6 +336,12 @@
           todo.todayDoneDate = null;
           changed = true;
         }
+      }
+    });
+    targetState.events.forEach(evt => {
+      if (evt.snoozeUntil && today >= evt.snoozeUntil) {
+        evt.snoozeUntil = null;
+        changed = true;
       }
     });
     return changed;
@@ -406,7 +447,7 @@
     const userControls = document.getElementById('userControls');
     const userEmailDisplay = document.getElementById('userEmailDisplay');
 
-    document.getElementById('googleLoginBtn').addEventListener('click', () => {
+    on('googleLoginBtn', 'click', () => {
       showAuthError('');
       auth.signInWithPopup(provider).catch((err) => {
         console.error('Google 登入錯誤:', err);
@@ -420,7 +461,7 @@
       });
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+    on('logoutBtn', 'click', () => {
       if (!confirm('確定要登出嗎？')) return;
       stopCloudSync();
       auth.signOut();
@@ -429,8 +470,8 @@
     auth.onAuthStateChanged((user) => {
       if (!user) {
         stopCloudSync();
-        authGate.classList.remove('hidden');
-        userControls.classList.add('hidden');
+        if (authGate) authGate.classList.remove('hidden');
+        if (userControls) userControls.classList.add('hidden');
         setSyncStatus('local', '等待登入');
         return;
       }
@@ -447,10 +488,12 @@
       }
 
       showAuthError('');
-      authGate.classList.add('hidden');
-      userControls.classList.remove('hidden');
-      userEmailDisplay.textContent = user.email;
-      userEmailDisplay.title = user.email;
+      if (authGate) authGate.classList.add('hidden');
+      if (userControls) userControls.classList.remove('hidden');
+      if (userEmailDisplay) {
+        userEmailDisplay.textContent = user.email;
+        userEmailDisplay.title = user.email;
+      }
 
       renderAll();
       startCloudSync();
@@ -481,8 +524,11 @@
   function initHeader() {
     const today = new Date();
     const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-    document.getElementById('todayDateDisplay').textContent =
-      `${today.getFullYear()} 年 ${today.getMonth() + 1} 月 ${today.getDate()} 日（週${weekdays[today.getDay()]}）`;
+    const todayEl = document.getElementById('todayDateDisplay');
+    if (todayEl) {
+      todayEl.textContent =
+        `${today.getFullYear()} 年 ${today.getMonth() + 1} 月 ${today.getDate()} 日（週${weekdays[today.getDay()]}）`;
+    }
 
     document.querySelectorAll('.nav-tab').forEach(btn => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -492,7 +538,7 @@
       btn.addEventListener('click', () => switchTab(btn.dataset.jumpTab));
     });
 
-    document.getElementById('exportDataBtn').addEventListener('click', () => {
+    on('exportDataBtn', 'click', () => {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -504,27 +550,29 @@
     });
 
     const fileInput = document.getElementById('importFileInput');
-    document.getElementById('importDataBtn').addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const imported = JSON.parse(reader.result);
-          if (!imported.teaching || !imported.sources) throw new Error('格式不符');
-          state = migrateAndNormalizeState(imported);
-          normalizeDailyStates(state);
-          saveState();
-          renderAll();
-          showToast('資料已成功還原並同步');
-        } catch {
-          alert('匯入失敗：請確認檔案為本系統匯出的 JSON 備份檔。');
-        }
-      };
-      reader.readAsText(file);
-      fileInput.value = '';
-    });
+    on('importDataBtn', 'click', () => fileInput && fileInput.click());
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const imported = JSON.parse(reader.result);
+            if (!imported.teaching || !imported.sources) throw new Error('格式不符');
+            state = migrateAndNormalizeState(imported);
+            normalizeDailyStates(state);
+            saveState();
+            renderAll();
+            showToast('資料已成功還原並同步');
+          } catch {
+            alert('匯入失敗：請確認檔案為本系統匯出的 JSON 備份檔。');
+          }
+        };
+        reader.readAsText(file);
+        fileInput.value = '';
+      });
+    }
 
     document.querySelectorAll('[data-close]').forEach(btn => {
       btn.addEventListener('click', () => closeModal(btn.dataset.close));
@@ -537,11 +585,13 @@
   }
 
   function openModal(id) {
-    document.getElementById(id).classList.remove('hidden');
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('hidden');
   }
 
   function closeModal(id) {
-    document.getElementById(id).classList.add('hidden');
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
   }
 
   // ==================== 計算各班「今日進度」與「下堂課進度」 ====================
@@ -586,7 +636,7 @@
     return { todaySlot, nextSlot, isPinned };
   }
 
-  // ==================== 首頁：RPG 個人秘書、整合條列與綜合歷史紀錄 ====================
+  // ==================== 首頁：RPG 個人秘書、頭像裁切、AI 簡報、整合條列與歷史 ====================
   function initBriefing() {
     document.querySelectorAll('[data-briefing-view]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -597,57 +647,232 @@
     });
 
     ['briefingHistoryFilterType', 'briefingHistorySearch'].forEach(id => {
-      document.getElementById(id).addEventListener('input', renderBriefingHistory);
+      on(id, 'input', renderBriefingHistory);
     });
 
+    // ---------- 頭像等比例裁切與縮放 ----------
     const portraitBox = document.getElementById('rpgPortraitBox');
     const avatarInput = document.getElementById('rpgAvatarInput');
+    const cropCanvas = document.getElementById('avatarCropCanvas');
+    const zoomSlider = document.getElementById('avatarZoomSlider');
+    const zoomValue = document.getElementById('avatarZoomValue');
 
-    portraitBox.addEventListener('click', () => avatarInput.click());
+    const CROP_W = cropCanvas ? cropCanvas.width : 304;
+    const CROP_H = cropCanvas ? cropCanvas.height : 372;
+    const cropCtx = cropCanvas ? cropCanvas.getContext('2d') : null;
 
-    avatarInput.addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const maxSize = 400;
-          let { width, height } = img;
-          if (width > maxSize || height > maxSize) {
-            const ratio = Math.min(maxSize / width, maxSize / height);
-            width = Math.round(width * ratio);
-            height = Math.round(height * ratio);
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-          state.secretary.avatar = canvas.toDataURL(mime, 0.85);
-          saveState();
-          renderSecretaryBox();
-          showToast('已更新個人秘書圖像');
+    const cropState = {
+      img: null,
+      mime: 'image/jpeg',
+      zoom: 1,
+      offsetX: 0,
+      offsetY: 0,
+      dragging: false,
+      lastX: 0,
+      lastY: 0
+    };
+
+    function drawCropCanvas() {
+      if (!cropCtx || !cropState.img) return;
+      const { img, zoom } = cropState;
+      const baseScale = Math.max(CROP_W / img.width, CROP_H / img.height);
+      const scale = baseScale * zoom;
+      const drawW = img.width * scale;
+      const drawH = img.height * scale;
+
+      const maxOffsetX = Math.max(0, (drawW - CROP_W) / 2);
+      const maxOffsetY = Math.max(0, (drawH - CROP_H) / 2);
+      cropState.offsetX = Math.min(maxOffsetX, Math.max(-maxOffsetX, cropState.offsetX));
+      cropState.offsetY = Math.min(maxOffsetY, Math.max(-maxOffsetY, cropState.offsetY));
+
+      const drawX = (CROP_W - drawW) / 2 + cropState.offsetX;
+      const drawY = (CROP_H - drawH) / 2 + cropState.offsetY;
+
+      cropCtx.clearRect(0, 0, CROP_W, CROP_H);
+      if (cropState.mime !== 'image/png') {
+        cropCtx.fillStyle = '#F3EFE7';
+        cropCtx.fillRect(0, 0, CROP_W, CROP_H);
+      }
+      cropCtx.imageSmoothingEnabled = true;
+      cropCtx.imageSmoothingQuality = 'high';
+      cropCtx.drawImage(img, drawX, drawY, drawW, drawH);
+    }
+
+    function setCropZoom(nextZoom) {
+      const clamped = Math.min(3.5, Math.max(1, nextZoom));
+      const ratio = clamped / cropState.zoom;
+      cropState.zoom = clamped;
+      cropState.offsetX *= ratio;
+      cropState.offsetY *= ratio;
+      if (zoomSlider) zoomSlider.value = clamped.toFixed(2);
+      if (zoomValue) zoomValue.textContent = `${Math.round(clamped * 100)}%`;
+      drawCropCanvas();
+    }
+
+    function resetCropView() {
+      cropState.zoom = 1;
+      cropState.offsetX = 0;
+      cropState.offsetY = 0;
+      if (zoomSlider) zoomSlider.value = '1';
+      if (zoomValue) zoomValue.textContent = '100%';
+      drawCropCanvas();
+    }
+
+    if (portraitBox && avatarInput) {
+      portraitBox.addEventListener('click', () => avatarInput.click());
+      avatarInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            if (cropCanvas) {
+              cropState.img = img;
+              cropState.mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+              resetCropView();
+              openModal('avatarCropModal');
+            } else {
+              // 若 index.html 尚未加入裁切視窗，自動置中裁切
+              const c = document.createElement('canvas');
+              c.width = 304;
+              c.height = 372;
+              const ctx = c.getContext('2d');
+              const s = Math.max(c.width / img.width, c.height / img.height);
+              const w = img.width * s;
+              const h = img.height * s;
+              ctx.drawImage(img, (c.width - w) / 2, (c.height - h) / 2, w, h);
+              state.secretary.avatar = c.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.88);
+              saveState();
+              renderSecretaryBox();
+              showToast('已更新個人秘書頭像');
+            }
+          };
+          img.src = reader.result;
         };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-      avatarInput.value = '';
-    });
+        reader.readAsDataURL(file);
+        avatarInput.value = '';
+      });
+    }
 
-    document.getElementById('rpgEditNameBtn').addEventListener('click', () => {
-      const nextName = prompt('請輸入個人秘書的名稱或稱呼：', state.secretary.name);
-      if (nextName === null) return;
-      const trimmed = nextName.trim();
-      if (!trimmed) return;
-      state.secretary.name = trimmed;
+    if (zoomSlider) {
+      zoomSlider.addEventListener('input', (e) => setCropZoom(parseFloat(e.target.value)));
+    }
+
+    if (cropCanvas) {
+      cropCanvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        setCropZoom(cropState.zoom + (e.deltaY < 0 ? 0.12 : -0.12));
+      }, { passive: false });
+
+      cropCanvas.addEventListener('pointerdown', (e) => {
+        cropState.dragging = true;
+        cropState.lastX = e.clientX;
+        cropState.lastY = e.clientY;
+        cropCanvas.setPointerCapture(e.pointerId);
+      });
+
+      cropCanvas.addEventListener('pointermove', (e) => {
+        if (!cropState.dragging) return;
+        const cssToCanvas = CROP_W / (cropCanvas.clientWidth || 228);
+        cropState.offsetX += (e.clientX - cropState.lastX) * cssToCanvas;
+        cropState.offsetY += (e.clientY - cropState.lastY) * cssToCanvas;
+        cropState.lastX = e.clientX;
+        cropState.lastY = e.clientY;
+        drawCropCanvas();
+      });
+
+      const stopCropDrag = () => { cropState.dragging = false; };
+      cropCanvas.addEventListener('pointerup', stopCropDrag);
+      cropCanvas.addEventListener('pointercancel', stopCropDrag);
+    }
+
+    on('avatarResetCropBtn', 'click', resetCropView);
+
+    on('avatarApplyCropBtn', 'click', () => {
+      if (!cropState.img || !cropCanvas) return;
+      drawCropCanvas();
+      state.secretary.avatar = cropCanvas.toDataURL(cropState.mime, 0.88);
       saveState();
       renderSecretaryBox();
-      showToast('已更新秘書稱呼');
+      closeModal('avatarCropModal');
+      showToast('已裁切並更新個人秘書頭像');
     });
 
-    document.getElementById('rpgResetAvatarBtn').addEventListener('click', () => {
+    // ---------- AI 秘書設定與重新彙報 ----------
+    function openSecretarySettingsModal() {
+      if (!document.getElementById('secretarySettingsModal')) {
+        const nextName = prompt('請輸入個人秘書的名稱或稱呼：', state.secretary.name);
+        if (nextName && nextName.trim()) {
+          state.secretary.name = nextName.trim();
+          saveState();
+          renderSecretaryBox();
+        }
+        return;
+      }
+      document.getElementById('secNameInput').value = state.secretary.name || '傑森的線上秘書';
+      document.getElementById('secApiKeyInput').value = state.secretary.apiKey || '';
+      document.getElementById('secApiKeyInput').type = 'password';
+      document.getElementById('toggleApiKeyVisBtn').textContent = '顯示';
+      document.getElementById('secModelSelect').value = state.secretary.model || 'gemini-2.5-flash';
+      document.getElementById('secPersonaInput').value = state.secretary.persona || DEFAULT_SECRETARY_PERSONA;
+      openModal('secretarySettingsModal');
+    }
+
+    on('rpgEditNameBtn', 'click', openSecretarySettingsModal);
+    on('rpgOpenSettingsBtn', 'click', openSecretarySettingsModal);
+
+    on('toggleApiKeyVisBtn', 'click', (e) => {
+      const input = document.getElementById('secApiKeyInput');
+      const isPwd = input.type === 'password';
+      input.type = isPwd ? 'text' : 'password';
+      e.target.textContent = isPwd ? '隱藏' : '顯示';
+    });
+
+    on('secResetPersonaBtn', 'click', () => {
+      const el = document.getElementById('secPersonaInput');
+      if (el) el.value = DEFAULT_SECRETARY_PERSONA;
+    });
+
+    on('saveSecretarySettingsBtn', 'click', () => {
+      const name = document.getElementById('secNameInput').value.trim() || '傑森的線上秘書';
+      const apiKey = document.getElementById('secApiKeyInput').value.trim();
+      const model = document.getElementById('secModelSelect').value || 'gemini-2.5-flash';
+      const persona = document.getElementById('secPersonaInput').value.trim() || DEFAULT_SECRETARY_PERSONA;
+
+      state.secretary.name = name;
+      state.secretary.apiKey = apiKey;
+      state.secretary.model = model;
+      state.secretary.persona = persona;
+      state.secretary.lastBriefingHash = '';
+      lastFailedBriefingHash = '';
+
+      saveState();
+      closeModal('secretarySettingsModal');
+      showToast('已儲存 AI 秘書設定');
+
+      if (latestBriefingPayload) {
+        if (apiKey) {
+          generateAiBriefing(latestBriefingPayload, true);
+        } else {
+          renderSecretaryBox(latestBriefingPayload);
+        }
+      }
+    });
+
+    on('rpgRefreshAiBtn', 'click', () => {
+      if (!state.secretary.apiKey) {
+        showToast('請先填入免費的 Gemini API Key 以啟用 AI 簡報');
+        openSecretarySettingsModal();
+        return;
+      }
+      if (latestBriefingPayload) {
+        lastFailedBriefingHash = '';
+        generateAiBriefing(latestBriefingPayload, true);
+      }
+    });
+
+    on('rpgResetAvatarBtn', 'click', () => {
       if (!confirm('確定要移除目前的秘書圖像嗎？')) return;
       state.secretary.avatar = '';
       saveState();
@@ -655,7 +880,8 @@
       showToast('已移除秘書圖像');
     });
 
-    document.getElementById('resolveTodayDoneBtn').addEventListener('click', () => {
+    // ---------- 待辦處理詢問視窗 ----------
+    on('resolveTodayDoneBtn', 'click', () => {
       const id = document.getElementById('resolveTodoId').value;
       const todo = state.todos.find(t => t.id === id);
       if (!todo) return;
@@ -667,7 +893,7 @@
       showToast(`「${todo.title}」已標記今日進度完成，明日將繼續提醒`);
     });
 
-    document.getElementById('resolveCompleteBtn').addEventListener('click', () => {
+    on('resolveCompleteBtn', 'click', () => {
       const id = document.getElementById('resolveTodoId').value;
       const todo = state.todos.find(t => t.id === id);
       if (!todo) return;
@@ -678,6 +904,70 @@
       closeModal('todoResolveModal');
       renderAll();
       showToast(`「${todo.title}」已完成並移入歷史備查`);
+    });
+
+    // ---------- 非當天活動提醒處理視窗 ----------
+    on('resolveEventUntilDayBtn', 'click', () => {
+      const id = document.getElementById('resolveEventId').value;
+      const evt = state.events.find(e => e.id === id);
+      if (!evt) return;
+      evt.snoozeUntil = evt.date;
+      saveState();
+      closeModal('eventResolveModal');
+      renderAll();
+      showToast(`「${evt.name}」至活動前一天不再提醒，將於 ${evt.date} 當天恢復顯示`);
+    });
+
+    on('resolveEventDayBeforeBtn', 'click', () => {
+      const id = document.getElementById('resolveEventId').value;
+      const evt = state.events.find(e => e.id === id);
+      if (!evt) return;
+      const dayBefore = addDays(evt.date, -1);
+      evt.snoozeUntil = dayBefore;
+      saveState();
+      closeModal('eventResolveModal');
+      renderAll();
+      showToast(`「${evt.name}」已暫停提醒，將於活動前一天（${dayBefore}）恢復顯示`);
+    });
+
+    on('resolveEventCustomBtn', 'click', () => {
+      const id = document.getElementById('resolveEventId').value;
+      const evt = state.events.find(e => e.id === id);
+      if (!evt) return;
+      const picked = document.getElementById('resolveEventCustomDate').value;
+      const today = getTodayStr();
+      if (!picked || picked <= today) {
+        return showToast('請選擇明天之後的日期');
+      }
+      evt.snoozeUntil = picked;
+      saveState();
+      closeModal('eventResolveModal');
+      renderAll();
+      showToast(`「${evt.name}」於 ${picked} 前不再提醒，將於該日恢復顯示`);
+    });
+
+    on('resolveEventKeepBtn', 'click', () => {
+      const id = document.getElementById('resolveEventId').value;
+      const evt = state.events.find(e => e.id === id);
+      if (!evt) return;
+      evt.snoozeUntil = null;
+      saveState();
+      closeModal('eventResolveModal');
+      renderAll();
+      showToast(`「${evt.name}」將持續於 Today's Briefing 提醒`);
+    });
+
+    on('resolveEventArchiveBtn', 'click', () => {
+      const id = document.getElementById('resolveEventId').value;
+      const evt = state.events.find(e => e.id === id);
+      if (!evt) return;
+      evt.archived = true;
+      evt.archivedAt = getTodayStr();
+      evt.snoozeUntil = null;
+      saveState();
+      closeModal('eventResolveModal');
+      renderAll();
+      showToast(`活動「${evt.name}」已撤除並納入歷史備查`);
     });
   }
 
@@ -691,13 +981,46 @@
     document.getElementById('briefingHistoryFilters').classList.toggle('hidden', !isHistory);
     document.getElementById('briefingSubHint').textContent = isHistory
       ? '彙整三大平台所有已完成教學事項、結案待辦與已結束／歸檔活動，可隨時建立副本重複使用'
-      : '條列整合三大平台重點：勾選即同步更新狀態（待辦事項將進一步確認進度）';
+      : '條列整合三大平台重點：勾選即同步更新狀態（待辦事項與非當天活動將進一步確認處理方式）';
   }
 
   function openTodoResolveModal(todo) {
     document.getElementById('resolveTodoId').value = todo.id;
     document.getElementById('resolveTodoTitleDisplay').textContent = todo.title;
     openModal('todoResolveModal');
+  }
+
+  function openEventResolveModal(evt) {
+    const modal = document.getElementById('eventResolveModal');
+    if (!modal) {
+      alert('找不到活動提醒設定視窗（eventResolveModal），請確認 index.html 已貼上 Modal 7。');
+      return;
+    }
+
+    const today = getTodayStr();
+    const tomorrow = addDays(today, 1);
+    const dayBefore = addDays(evt.date, -1);
+    const daysLeft = diffDays(today, evt.date);
+
+    document.getElementById('resolveEventId').value = evt.id;
+    document.getElementById('resolveEventTitleDisplay').textContent = evt.name;
+    document.getElementById('resolveEventDateDisplay').textContent = evt.date;
+    document.getElementById('resolveEventUntilDayDate').textContent = evt.date;
+
+    const dayBeforeBtn = document.getElementById('resolveEventDayBeforeBtn');
+    if (daysLeft >= 2) {
+      document.getElementById('resolveEventDayBeforeDate').textContent = dayBefore;
+      dayBeforeBtn.classList.remove('hidden');
+    } else {
+      dayBeforeBtn.classList.add('hidden');
+    }
+
+    const customDateInput = document.getElementById('resolveEventCustomDate');
+    customDateInput.min = tomorrow;
+    customDateInput.max = evt.date;
+    customDateInput.value = tomorrow <= evt.date ? tomorrow : evt.date;
+
+    openModal('eventResolveModal');
   }
 
   function getTimeGreeting() {
@@ -707,10 +1030,121 @@
     return '晚安';
   }
 
-  function renderSecretaryBox(counts = null) {
+  function buildFallbackDialogue(payload) {
+    const { teachingPending, eventsCount, todosCount } = payload;
+    const totalPending = teachingPending + eventsCount + todosCount;
+    const greeting = getTimeGreeting();
+    if (totalPending === 0) {
+      return `「${greeting}，Jace！今天的教學、七日內活動與待辦事項都已經清空囉。趁現在好好喝杯茶、喘口氣吧。」`;
+    }
+    return `「${greeting}，Jace！我已經把今天的重點都整理在下方清單裡了——目前還有 ${teachingPending} 項今日教學進度、${eventsCount} 個七日內活動，以及 ${todosCount} 件待辦事項。處理完直接打勾就可以了！」`;
+  }
+
+  async function generateAiBriefing(payload, isManual = false) {
+    const apiKey = (state.secretary.apiKey || '').trim();
+    if (!apiKey || isGeneratingAiBriefing) return;
+
+    isGeneratingAiBriefing = true;
+    const dialogueEl = document.getElementById('rpgDialogueText');
+    const refreshBtn = document.getElementById('rpgRefreshAiBtn');
+    const aiBadge = document.getElementById('rpgAiBadge');
+
+    if (dialogueEl) {
+      dialogueEl.classList.add('is-loading');
+      dialogueEl.textContent = '「正在檢視各平台的最新進度與行程，請稍候一下……」';
+    }
+    if (refreshBtn) {
+      refreshBtn.disabled = true;
+      refreshBtn.textContent = '整理中...';
+    }
+
+    const today = new Date();
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const dateHeader = `${getTodayStr()}（週${weekdays[today.getDay()]}，目前時段：${getTimeGreeting()}）`;
+
+    const promptText = [
+      `你的角色稱呼：${state.secretary.name || '傑森的線上秘書'}`,
+      `人設與回覆規則：${state.secretary.persona || DEFAULT_SECRETARY_PERSONA}`,
+      '',
+      `今天日期：${dateHeader}`,
+      '',
+      '【一、教學進度平台（今日與下堂課）】',
+      payload.teachingSummary.length ? payload.teachingSummary.join('\n') : '（目前無排定或待教項目）',
+      '',
+      '【二、活動提醒平台（七日內或提醒中）】',
+      payload.eventSummary.length ? payload.eventSummary.join('\n') : '（七日內無即將到來的活動）',
+      '',
+      '【三、待辦事項平台（進行中）】',
+      payload.todoSummary.length ? payload.todoSummary.join('\n') : '（目前沒有未處理的待辦事項）',
+      '',
+      '請直接輸出你要對 Jace 說的話（可用「」包住，不要加上多餘前言或說明）。'
+    ].join('\n');
+
+    const model = state.secretary.model || 'gemini-2.5-flash';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: {
+            temperature: 0.75,
+            maxOutputTokens: 1200
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message || `HTTP ${res.status}`);
+      }
+
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const aiText = parts
+        .filter(p => !p.thought && p.text)
+        .map(p => p.text)
+        .join('')
+        .trim();
+
+      if (!aiText) throw new Error('模型未回傳文字內容');
+
+      state.secretary.lastBriefingText = aiText;
+      state.secretary.lastBriefingHash = payload.hash;
+      lastFailedBriefingHash = '';
+      saveState();
+
+      if (dialogueEl) {
+        dialogueEl.classList.remove('is-loading');
+        dialogueEl.textContent = aiText;
+      }
+      if (aiBadge) aiBadge.classList.remove('hidden');
+      if (isManual) showToast('AI 秘書已完成最新彙報');
+    } catch (err) {
+      console.error('Gemini API 呼叫失敗:', err);
+      lastFailedBriefingHash = payload.hash;
+      if (dialogueEl) {
+        dialogueEl.classList.remove('is-loading');
+        dialogueEl.textContent = state.secretary.lastBriefingText || buildFallbackDialogue(payload);
+      }
+      if (isManual) {
+        showToast(`AI 彙報失敗：${err.message}`);
+      }
+    } finally {
+      isGeneratingAiBriefing = false;
+      if (refreshBtn) {
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '↻ 重新彙報';
+      }
+    }
+  }
+
+  function renderSecretaryBox(payload = null) {
     const imgEl = document.getElementById('rpgPortraitImg');
     const placeholderEl = document.getElementById('rpgPortraitPlaceholder');
     const resetBtn = document.getElementById('rpgResetAvatarBtn');
+    const aiBadge = document.getElementById('rpgAiBadge');
 
     document.getElementById('rpgNameDisplay').textContent = state.secretary.name || '傑森的線上秘書';
 
@@ -726,24 +1160,44 @@
       resetBtn.classList.add('hidden');
     }
 
-    if (!counts) return;
+    if (!payload) return;
+    latestBriefingPayload = payload;
 
-    const { teachingPending, eventsCount, todosCount } = counts;
-    const totalPending = teachingPending + eventsCount + todosCount;
-    const greeting = getTimeGreeting();
+    const { teachingPending, eventsCount, todosCount, hash } = payload;
     const dialogueEl = document.getElementById('rpgDialogueText');
-
-    if (totalPending === 0) {
-      dialogueEl.textContent = `「${greeting}，Jace！今天的教學、七日內活動與待辦事項都已經清空囉。趁現在好好喝杯茶、喘口氣吧。」`;
-    } else {
-      dialogueEl.textContent = `「${greeting}，Jace！我已經把今天的重點都整理在下方清單裡了——目前還有 ${teachingPending} 項今日教學進度、${eventsCount} 個七日內活動，以及 ${todosCount} 件待辦事項。處理完直接打勾就可以了！」`;
-    }
 
     document.getElementById('rpgSummaryPills').innerHTML = `
       <span class="rpg-stat-pill">今日待教<strong>${teachingPending}</strong>項</span>
       <span class="rpg-stat-pill">七日內活動<strong>${eventsCount}</strong>件</span>
       <span class="rpg-stat-pill">待處理待辦<strong>${todosCount}</strong>件</span>
     `;
+
+    const hasApiKey = !!(state.secretary.apiKey && state.secretary.apiKey.trim());
+    if (aiBadge) aiBadge.classList.toggle('hidden', !hasApiKey);
+
+    if (!hasApiKey) {
+      dialogueEl.classList.remove('is-loading');
+      dialogueEl.textContent = buildFallbackDialogue(payload);
+      return;
+    }
+
+    if (state.secretary.lastBriefingHash === hash && state.secretary.lastBriefingText) {
+      dialogueEl.classList.remove('is-loading');
+      dialogueEl.textContent = state.secretary.lastBriefingText;
+      return;
+    }
+
+    if (!isGeneratingAiBriefing) {
+      dialogueEl.textContent = state.secretary.lastBriefingText || buildFallbackDialogue(payload);
+      if (lastFailedBriefingHash !== hash) {
+        clearTimeout(aiAutoTimer);
+        aiAutoTimer = setTimeout(() => {
+          if (latestBriefingPayload && latestBriefingPayload.hash === hash && state.secretary.lastBriefingHash !== hash) {
+            generateAiBriefing(latestBriefingPayload, false);
+          }
+        }, 1200);
+      }
+    }
   }
 
   function renderBriefingHistory() {
@@ -753,7 +1207,6 @@
 
     const records = [];
 
-    // 1. 已完成的教學進度事項（跨全部班級）
     state.teaching.classes.forEach(cls => {
       cls.items
         .filter(item => item.completed)
@@ -773,7 +1226,6 @@
         });
     });
 
-    // 2. 已結案的待辦事項
     state.todos
       .filter(t => t.status === 'completed')
       .forEach(todo => {
@@ -788,7 +1240,6 @@
         });
       });
 
-    // 3. 已結束或已歸檔的活動
     state.events
       .filter(e => e.archived || e.date < today)
       .forEach(evt => {
@@ -924,6 +1375,7 @@
           restoreBtn.addEventListener('click', () => {
             evt.archived = false;
             evt.archivedAt = null;
+            evt.snoozeUntil = null;
             saveState();
             renderEvents();
             renderBriefing();
@@ -945,6 +1397,7 @@
     let teachingPending = 0;
     let rowCount = 0;
 
+    // 1. 教學進度（各班今日進度 + 下堂課進度）
     state.teaching.classes.forEach(cls => {
       const { todaySlot, nextSlot } = getClassLessonBriefing(cls);
 
@@ -1022,9 +1475,18 @@
       }
     });
 
-    const upcoming7Days = state.events
-      .filter(e => !e.archived && e.date >= today && diffDays(today, e.date) <= 7)
+    // 2. 七日內或已到提醒日的活動（排除暫停提醒尚未到期者）
+    const activeWindowEvents = state.events.filter(
+      e => !e.archived && e.date >= today && (diffDays(today, e.date) <= 7 || today >= e.remindDate)
+    );
+
+    const upcoming7Days = activeWindowEvents
+      .filter(e => !e.snoozeUntil || today >= e.snoozeUntil)
       .sort((a, b) => a.date.localeCompare(b.date));
+
+    const hiddenSnoozedEventsCount = activeWindowEvents.filter(
+      e => e.snoozeUntil && today < e.snoozeUntil
+    ).length;
 
     upcoming7Days.forEach(evt => {
       rowCount++;
@@ -1057,8 +1519,14 @@
 
       li.querySelector('input').addEventListener('change', (e) => {
         if (!e.target.checked) return;
+        if (evt.date > today) {
+          e.target.checked = false;
+          openEventResolveModal(evt);
+          return;
+        }
         evt.archived = true;
         evt.archivedAt = getTodayStr();
+        evt.snoozeUntil = null;
         saveState();
         renderEvents();
         renderBriefing();
@@ -1068,6 +1536,7 @@
       listEl.appendChild(li);
     });
 
+    // 3. 待辦事項（全列，排除今日已標記「今日進度已完成」者）
     const visibleTodos = state.todos.filter(
       t => t.status !== 'completed' && !(t.status === 'today_done' && t.todayDoneDate === today)
     );
@@ -1118,17 +1587,69 @@
     }
 
     const footnote = document.getElementById('briefingTodoHiddenHint');
+    const hiddenNotes = [];
     if (hiddenTodayDoneCount > 0) {
-      footnote.textContent = `※ 今日已有 ${hiddenTodayDoneCount} 件待辦事項標記為「今日進度已完成」，今日暫不顯示，將於明日自動恢復於此條列中。`;
+      hiddenNotes.push(`今日已有 ${hiddenTodayDoneCount} 件待辦標記「今日進度已完成」（將於明日自動恢復）`);
+    }
+    if (hiddenSnoozedEventsCount > 0) {
+      hiddenNotes.push(`另有 ${hiddenSnoozedEventsCount} 個活動已暫停首頁提醒（可至「活動提醒平台」檢視或提前恢復）`);
+    }
+    if (hiddenNotes.length > 0) {
+      footnote.textContent = `※ ${hiddenNotes.join('；')}。`;
       footnote.classList.remove('hidden');
     } else {
       footnote.classList.add('hidden');
     }
 
+    // 組裝三大平台摘要供 AI 秘書檢視
+    const teachingSummary = [];
+    state.teaching.classes.forEach(cls => {
+      const { todaySlot, nextSlot } = getClassLessonBriefing(cls);
+      if (todaySlot && todaySlot.items.length > 0) {
+        todaySlot.items.forEach(item => {
+          teachingSummary.push(
+            `[今日・${cls.name} W${todaySlot.week}-第${todaySlot.period}節] ${item.completed ? '(已完成)' : '(待教)'} ${item.name}${item.type ? `(${item.type})` : ''}${item.desc ? ` - 備註:${item.desc}` : ''}`
+          );
+        });
+      }
+      if (nextSlot && nextSlot.items.length > 0) {
+        nextSlot.items.forEach(item => {
+          teachingSummary.push(
+            `[下堂課・${cls.name} W${nextSlot.week}-第${nextSlot.period}節] ${item.name}${item.type ? `(${item.type})` : ''}`
+          );
+        });
+      }
+    });
+
+    const eventSummary = upcoming7Days.map(evt => {
+      const daysLeft = diffDays(today, evt.date);
+      const dayText = daysLeft === 0 ? '今天' : daysLeft === 1 ? '明天' : `${daysLeft}天後`;
+      return `[${dayText}・${evt.date}] ${evt.name}${evt.time ? ` 時間:${evt.time}` : ''}${evt.location ? ` 地點:${evt.location}` : ''}${evt.note ? ` 備註:${evt.note}` : ''}`;
+    });
+
+    const todoSummary = visibleTodos.map(todo => {
+      const src = getSourceById(todo.sourceId);
+      return `[${src.name}] ${todo.title}${todo.content ? `：${todo.content}` : ''}${todo.note ? `（備註：${todo.note}）` : ''}`;
+    });
+
+    const briefingHash = JSON.stringify({
+      d: today,
+      g: getTimeGreeting(),
+      n: state.secretary.name,
+      p: state.secretary.persona,
+      t: teachingSummary,
+      e: eventSummary,
+      o: todoSummary
+    });
+
     renderSecretaryBox({
       teachingPending,
       eventsCount: upcoming7Days.length,
-      todosCount: visibleTodos.length
+      todosCount: visibleTodos.length,
+      teachingSummary,
+      eventSummary,
+      todoSummary,
+      hash: briefingHash
     });
     renderBriefingHistory();
   }
@@ -1176,17 +1697,11 @@
   }
 
   function initTeaching() {
-    document.getElementById('toggleMultiSelectBtn').addEventListener('click', () => {
-      setMultiSelectMode(!isMultiSelectMode);
-    });
-    document.getElementById('stagingMultiBtn').addEventListener('click', () => {
-      setMultiSelectMode(!isMultiSelectMode);
-    });
-    document.getElementById('exitMultiSelectBtn').addEventListener('click', () => {
-      setMultiSelectMode(false);
-    });
+    on('toggleMultiSelectBtn', 'click', () => setMultiSelectMode(!isMultiSelectMode));
+    on('stagingMultiBtn', 'click', () => setMultiSelectMode(!isMultiSelectMode));
+    on('exitMultiSelectBtn', 'click', () => setMultiSelectMode(false));
 
-    document.getElementById('batchSelectAllStagingBtn').addEventListener('click', () => {
+    on('batchSelectAllStagingBtn', 'click', () => {
       const cls = getActiveClass();
       cls.items
         .filter(i => i.location.type === 'staging')
@@ -1194,12 +1709,12 @@
       renderTeaching();
     });
 
-    document.getElementById('batchClearSelectionBtn').addEventListener('click', () => {
+    on('batchClearSelectionBtn', 'click', () => {
       selectedPlanIds.clear();
       renderTeaching();
     });
 
-    document.getElementById('batchDuplicateBtn').addEventListener('click', () => {
+    on('batchDuplicateBtn', 'click', () => {
       const targetClassId = document.getElementById('batchTargetClassSelect').value;
       const ids = Array.from(selectedPlanIds);
       if (ids.length === 0) return showToast('請先點擊項目進行選取');
@@ -1208,7 +1723,7 @@
       renderTeaching();
     });
 
-    document.getElementById('addClassBtn').addEventListener('click', () => {
+    on('addClassBtn', 'click', () => {
       document.getElementById('classModalMode').value = 'add';
       document.getElementById('classModalTitle').textContent = '新增班級';
       document.getElementById('classNameInput').value = '';
@@ -1216,7 +1731,7 @@
       setTimeout(() => document.getElementById('classNameInput').focus(), 50);
     });
 
-    document.getElementById('renameClassBtn').addEventListener('click', () => {
+    on('renameClassBtn', 'click', () => {
       const cls = getActiveClass();
       document.getElementById('classModalMode').value = 'rename';
       document.getElementById('classModalTitle').textContent = '重新命名班級';
@@ -1225,7 +1740,7 @@
       setTimeout(() => document.getElementById('classNameInput').focus(), 50);
     });
 
-    document.getElementById('saveClassModalBtn').addEventListener('click', () => {
+    on('saveClassModalBtn', 'click', () => {
       const mode = document.getElementById('classModalMode').value;
       const name = document.getElementById('classNameInput').value.trim();
       if (!name) return showToast('請輸入班級名稱');
@@ -1249,7 +1764,7 @@
       renderBriefing();
     });
 
-    document.getElementById('deleteClassBtn').addEventListener('click', () => {
+    on('deleteClassBtn', 'click', () => {
       if (state.teaching.classes.length <= 1) {
         return showToast('至少需保留一個班級');
       }
@@ -1264,7 +1779,7 @@
       showToast(`已刪除班級「${cls.name}」`);
     });
 
-    document.getElementById('generateTableBtn').addEventListener('click', () => {
+    on('generateTableBtn', 'click', () => {
       const cls = getActiveClass();
       const weeksInput = document.getElementById('weeksInput');
       const periodsInput = document.getElementById('periodsInput');
@@ -1305,11 +1820,13 @@
         colorInput.value = swatch.dataset.color;
       });
     });
-    colorInput.addEventListener('input', () => {
-      document.querySelectorAll('#planColorPresets .swatch').forEach(s => s.classList.remove('active'));
-    });
+    if (colorInput) {
+      colorInput.addEventListener('input', () => {
+        document.querySelectorAll('#planColorPresets .swatch').forEach(s => s.classList.remove('active'));
+      });
+    }
 
-    document.getElementById('addPlanItemBtn').addEventListener('click', () => {
+    on('addPlanItemBtn', 'click', () => {
       const cls = getActiveClass();
       const nameEl = document.getElementById('planName');
       const typeEl = document.getElementById('planType');
@@ -1337,7 +1854,7 @@
       showToast(`已加入「${cls.name}」待排區`);
     });
 
-    document.getElementById('savePlanEditBtn').addEventListener('click', () => {
+    on('savePlanEditBtn', 'click', () => {
       const cls = getActiveClass();
       const id = document.getElementById('editPlanId').value;
       const item = cls.items.find(i => i.id === id);
@@ -1362,14 +1879,14 @@
       showToast('已更新教學事項');
     });
 
-    document.getElementById('duplicatePlanModalBtn').addEventListener('click', () => {
+    on('duplicatePlanModalBtn', 'click', () => {
       const id = document.getElementById('editPlanId').value;
       if (!id) return;
       duplicatePlanItems([id]);
       closeModal('planModal');
     });
 
-    document.getElementById('deletePlanItemBtn').addEventListener('click', () => {
+    on('deletePlanItemBtn', 'click', () => {
       const cls = getActiveClass();
       const id = document.getElementById('editPlanId').value;
       if (!confirm('確定要刪除此教學事項嗎？')) return;
@@ -1713,12 +2230,12 @@
   function initTodo() {
     document.getElementById('todoDate').value = getTodayStr();
 
-    document.getElementById('openSourceModalBtn').addEventListener('click', () => {
+    on('openSourceModalBtn', 'click', () => {
       renderSourceManager();
       openModal('sourceModal');
     });
 
-    document.getElementById('addSourceBtn').addEventListener('click', () => {
+    on('addSourceBtn', 'click', () => {
       const nameEl = document.getElementById('newSourceName');
       const colorEl = document.getElementById('newSourceColor');
       const name = nameEl.value.trim();
@@ -1733,7 +2250,7 @@
       showToast(`已新增來源「${name}」`);
     });
 
-    document.getElementById('addTodoBtn').addEventListener('click', () => {
+    on('addTodoBtn', 'click', () => {
       const titleEl = document.getElementById('todoTitle');
       const title = titleEl.value.trim();
       if (!title) {
@@ -1773,10 +2290,10 @@
     });
 
     ['todoFilterSource', 'todoFilterStatus', 'todoSearchInput'].forEach(id => {
-      document.getElementById(id).addEventListener('input', renderTodos);
+      on(id, 'input', renderTodos);
     });
 
-    document.getElementById('saveTodoEditBtn').addEventListener('click', () => {
+    on('saveTodoEditBtn', 'click', () => {
       const id = document.getElementById('editTodoId').value;
       const todo = state.todos.find(t => t.id === id);
       if (!todo) return;
@@ -2034,7 +2551,7 @@
     document.getElementById('eventDate').value = today;
     document.getElementById('eventRemindDate').value = today;
 
-    document.getElementById('addEventBtn').addEventListener('click', () => {
+    on('addEventBtn', 'click', () => {
       const nameEl = document.getElementById('eventName');
       const dateEl = document.getElementById('eventDate');
       const remindEl = document.getElementById('eventRemindDate');
@@ -2055,7 +2572,8 @@
         location: document.getElementById('eventLocation').value.trim(),
         note: document.getElementById('eventNote').value.trim(),
         archived: false,
-        archivedAt: null
+        archivedAt: null,
+        snoozeUntil: null
       });
 
       nameEl.value = '';
@@ -2079,9 +2597,9 @@
       });
     });
 
-    document.getElementById('eventSearchInput').addEventListener('input', renderEvents);
+    on('eventSearchInput', 'input', renderEvents);
 
-    document.getElementById('saveEventEditBtn').addEventListener('click', () => {
+    on('saveEventEditBtn', 'click', () => {
       const id = document.getElementById('editEventId').value;
       const evt = state.events.find(e => e.id === id);
       if (!evt) return;
@@ -2094,6 +2612,10 @@
       evt.time = document.getElementById('editEventTime').value.trim();
       evt.location = document.getElementById('editEventLocation').value.trim();
       evt.note = document.getElementById('editEventNote').value.trim();
+
+      if (evt.snoozeUntil && evt.snoozeUntil > evt.date) {
+        evt.snoozeUntil = null;
+      }
 
       saveState();
       renderEvents();
@@ -2118,7 +2640,9 @@
     document.getElementById('eventUpcomingCount').textContent = upcomingAll.length;
     document.getElementById('eventHistoryCount').textContent = historyAll.length;
 
-    const hasActiveReminder = upcomingAll.some(e => today >= e.remindDate && today <= e.date);
+    const hasActiveReminder = upcomingAll.some(
+      e => (!e.snoozeUntil || today >= e.snoozeUntil) && today >= e.remindDate && today <= e.date
+    );
     document.getElementById('eventAlertBadge').classList.toggle('hidden', !hasActiveReminder);
 
     const matchSearch = (e) => {
@@ -2142,7 +2666,8 @@
 
       filtered.forEach(evt => {
         const daysLeft = diffDays(today, evt.date);
-        const isReminding = !isPast && today >= evt.remindDate;
+        const isSnoozed = !isPast && evt.snoozeUntil && today < evt.snoozeUntil;
+        const isReminding = !isPast && !isSnoozed && today >= evt.remindDate;
 
         let badgeHtml = '';
         if (isPast) {
@@ -2151,6 +2676,8 @@
             : '<span class="event-badge past">已結束</span>';
         } else if (daysLeft === 0) {
           badgeHtml = '<span class="event-badge alert">就是今天</span>';
+        } else if (isSnoozed) {
+          badgeHtml = `<span class="event-badge snoozed">首頁暫停至 ${escapeHtml(evt.snoozeUntil)}</span>`;
         } else if (isReminding) {
           badgeHtml = `<span class="event-badge alert">提醒中｜倒數 ${daysLeft} 天</span>`;
         } else {
@@ -2169,6 +2696,7 @@
               <div class="card-title" style="margin-top:6px;">${escapeHtml(evt.name)}</div>
             </div>
             <div class="icon-actions">
+              ${isSnoozed ? `<button type="button" class="text-btn" data-unsnooze="${evt.id}">恢復首頁提醒</button>` : ''}
               <button type="button" class="text-btn" data-copy="${evt.id}">建立副本</button>
               ${!isPast ? `<button type="button" class="text-btn" data-archive="${evt.id}">標記已處理</button>` : ''}
               ${isPast && evt.archived && evt.date >= today ? `<button type="button" class="text-btn" data-unarchive="${evt.id}">復原</button>` : ''}
@@ -2184,6 +2712,17 @@
           ${evt.note ? `<div class="card-note">備註：${escapeHtml(evt.note)}</div>` : ''}
         `;
 
+        const unsnoozeBtn = card.querySelector('[data-unsnooze]');
+        if (unsnoozeBtn) {
+          unsnoozeBtn.addEventListener('click', () => {
+            evt.snoozeUntil = null;
+            saveState();
+            renderEvents();
+            renderBriefing();
+            showToast(`已恢復「${evt.name}」於 Today's Briefing 顯示`);
+          });
+        }
+
         card.querySelector('[data-copy]').addEventListener('click', () => duplicateEventItem(evt));
 
         const archiveBtn = card.querySelector('[data-archive]');
@@ -2191,6 +2730,7 @@
           archiveBtn.addEventListener('click', () => {
             evt.archived = true;
             evt.archivedAt = getTodayStr();
+            evt.snoozeUntil = null;
             saveState();
             renderEvents();
             renderBriefing();
@@ -2203,6 +2743,7 @@
           unarchiveBtn.addEventListener('click', () => {
             evt.archived = false;
             evt.archivedAt = null;
+            evt.snoozeUntil = null;
             saveState();
             renderEvents();
             renderBriefing();

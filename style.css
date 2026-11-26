@@ -394,11 +394,11 @@ button {
   border-radius: 14px;
   background: linear-gradient(180deg, #F3EFE7 0%, #E7E0D3 100%);
   border: 2px solid var(--border-strong);
-  box-shadow: 0 6px 18px rgba(51, 48, 46, 0.08), inset 0 0 0 3px rgba(255, 255, 255, 0.65);
+  box-shadow: 0 6px 18px rgba(51, 48, 46, 0.08);
   overflow: hidden;
   cursor: pointer;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   transition: border-color 0.2s, transform 0.2s;
 }
@@ -411,8 +411,8 @@ button {
 .rpg-portrait-img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center bottom;
+  object-fit: cover;
+  object-position: center;
   display: block;
 }
 
@@ -1882,4 +1882,146 @@ input[type="color"] {
   .col-period {
     width: 82px;
   }
+}
+
+/* ==================== 活動提醒詢問視窗（指定日期與暫停標籤） ==================== */
+.resolve-custom-box {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resolve-custom-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.resolve-custom-row input[type="date"] {
+  flex: 1;
+  background: #FFFFFF;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.event-badge.snoozed {
+  background: #EFECE6;
+  color: var(--ink-secondary);
+  border: 1px solid var(--border-strong);
+}
+
+/* ==================== 頭像等比例裁切視窗 ==================== */
+.crop-stage-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 18px;
+}
+
+.crop-viewport {
+  position: relative;
+  width: 228px;
+  height: 279px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow-md);
+  background: #EFECE6;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.crop-viewport:active {
+  cursor: grabbing;
+}
+
+#avatarCropCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.crop-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
+  background-size: 33.333% 33.333%;
+  background-position: -1px -1px;
+}
+
+.crop-controls {
+  padding: 0 6px;
+}
+
+.crop-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crop-zoom-label {
+  font-size: 13px;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+#avatarZoomSlider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.crop-zoom-value {
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== AI 秘書對話控制與設定 ==================== */
+.rpg-dialogue-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rpg-ai-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid #C7D6C8;
+  letter-spacing: 0.04em;
+}
+
+.rpg-dialogue-text.is-loading {
+  color: var(--ink-muted);
+  animation: aiPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes aiPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.api-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.api-key-row input {
+  flex: 1;
 }

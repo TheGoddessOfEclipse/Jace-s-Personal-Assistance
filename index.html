@@ -91,7 +91,11 @@
         <div class="rpg-dialogue-box">
           <div class="rpg-nameplate-row">
             <span id="rpgNameDisplay" class="rpg-nameplate">傑森的線上秘書</span>
-            <span class="rpg-sub-tag">TODAY'S BRIEFING</span>
+            <div class="rpg-dialogue-actions">
+              <span id="rpgAiBadge" class="rpg-ai-badge hidden">AI 簡報</span>
+              <button type="button" id="rpgRefreshAiBtn" class="btn-ghost-sm" title="讓 AI 立即重新檢視各平台並產生新簡報">↻ 重新彙報</button>
+              <button type="button" id="rpgOpenSettingsBtn" class="btn-ghost-sm" title="設定秘書名稱、Gemini API Key 與說話人設">⚙ AI 設定</button>
+            </div>
           </div>
           <p id="rpgDialogueText" class="rpg-dialogue-text"></p>
           <div id="rpgSummaryPills" class="rpg-summary-pills"></div>
@@ -586,6 +590,131 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn-ghost" data-close="todoResolveModal">先不要，取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 7：首頁非當天活動提醒處理 ==================== -->
+  <div id="eventResolveModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>設定活動提醒方式</h3>
+        <button type="button" class="modal-close" data-close="eventResolveModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resolveEventId" />
+        <p class="resolve-question">
+          「<strong id="resolveEventTitleDisplay"></strong>」（活動日：<span id="resolveEventDateDisplay"></span>）尚未到活動當天，請問接下來要如何提醒？
+        </p>
+        <div class="resolve-options">
+          <button type="button" id="resolveEventUntilDayBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">至活動前一天都不再提醒</span>
+            <span class="resolve-opt-desc">今日起暫時隱藏，將於活動當天（<span id="resolveEventUntilDayDate"></span>）重新顯示。</span>
+          </button>
+
+          <button type="button" id="resolveEventDayBeforeBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">活動前一天再提醒</span>
+            <span class="resolve-opt-desc">今日起暫時隱藏，將於活動前一天（<span id="resolveEventDayBeforeDate"></span>）重新顯示。</span>
+          </button>
+
+          <div class="resolve-custom-box">
+            <span class="resolve-opt-title">指定日期前不再提醒</span>
+            <span class="resolve-opt-desc">選擇下次要恢復出現於 Today's Briefing 的日期：</span>
+            <div class="resolve-custom-row">
+              <input type="date" id="resolveEventCustomDate" />
+              <button type="button" id="resolveEventCustomBtn" class="btn-primary btn-sm">套用日期</button>
+            </div>
+          </div>
+
+          <button type="button" id="resolveEventKeepBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">持續提醒（維持顯示）</span>
+            <span class="resolve-opt-desc">保留於 Today's Briefing 清單中，每日繼續提醒。</span>
+          </button>
+
+          <button type="button" id="resolveEventArchiveBtn" class="resolve-option-btn primary">
+            <span class="resolve-opt-title">✓ 已提前完成／直接歸檔歷史</span>
+            <span class="resolve-opt-desc">立即從清單撤除，並納入歷史備查。</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="eventResolveModal">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 8：個人秘書頭像裁切與縮放 ==================== -->
+  <div id="avatarCropModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>調整個人秘書頭像</h3>
+        <button type="button" class="modal-close" data-close="avatarCropModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint small-hint" style="text-align:center;">拖曳圖片調整位置，使用滑桿或滾輪放大（已鎖定外框比例）</p>
+        <div class="crop-stage-wrap">
+          <div class="crop-viewport">
+            <canvas id="avatarCropCanvas" width="304" height="372"></canvas>
+            <div class="crop-grid-overlay" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="crop-controls">
+          <div class="crop-zoom-row">
+            <span class="crop-zoom-label">縮放</span>
+            <input type="range" id="avatarZoomSlider" min="1" max="3.5" step="0.02" value="1" />
+            <span id="avatarZoomValue" class="crop-zoom-value">100%</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer space-between">
+        <button type="button" id="avatarResetCropBtn" class="btn-ghost">重設位置</button>
+        <div class="btn-group">
+          <button type="button" class="btn-ghost" data-close="avatarCropModal">取消</button>
+          <button type="button" id="avatarApplyCropBtn" class="btn-primary">套用頭像</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Modal 9：AI 個人秘書設定 ==================== -->
+  <div id="secretarySettingsModal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>AI 個人秘書設定</h3>
+        <button type="button" class="modal-close" data-close="secretarySettingsModal">&times;</button>
+      </div>
+      <div class="modal-body form-stack">
+        <div class="field">
+          <label for="secNameInput">秘書稱呼</label>
+          <input type="text" id="secNameInput" placeholder="例如：傑森的線上秘書、艾莉絲" />
+        </div>
+        <div class="field">
+          <label for="secApiKeyInput">Gemini API Key（僅存於你的專屬 Firebase，不會出現在程式碼中）</label>
+          <div class="api-key-row">
+            <input type="password" id="secApiKeyInput" placeholder="貼上 AIza 開頭的免費 API Key" autocomplete="off" />
+            <button type="button" id="toggleApiKeyVisBtn" class="btn-ghost-sm">顯示</button>
+          </div>
+          <span class="hint">留空時會自動使用內建統計台詞。</span>
+        </div>
+        <div class="field">
+          <label for="secModelSelect">使用模型</label>
+          <select id="secModelSelect">
+            <option value="gemini-2.5-flash">gemini-2.5-flash（推薦・聰明且快速）</option>
+            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite（輕量極速）</option>
+            <option value="gemini-2.0-flash">gemini-2.0-flash（穩定備用）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="secPersonaInput">秘書個性與說話風格（人設指令）</label>
+          <textarea id="secPersonaInput" rows="4" placeholder="描述希望秘書怎麼跟你說話..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer space-between">
+        <button type="button" id="secResetPersonaBtn" class="btn-ghost">恢復預設人設</button>
+        <div class="btn-group">
+          <button type="button" class="btn-ghost" data-close="secretarySettingsModal">取消</button>
+          <button type="button" id="saveSecretarySettingsBtn" class="btn-primary">儲存並重新彙報</button>
+        </div>
       </div>
     </div>
   </div>
