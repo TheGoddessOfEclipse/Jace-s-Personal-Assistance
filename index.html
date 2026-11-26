@@ -298,6 +298,36 @@
         </aside>
 
         <div class="list-panel">
+          <div class="card event-calendar-card">
+            <div class="event-cal-layout">
+              <div class="cal-box">
+                <div class="cal-header">
+                  <h3 id="calMonthLabel"></h3>
+                  <div class="cal-nav">
+                    <button type="button" id="calPrevBtn" class="btn-ghost-sm" title="上個月">‹</button>
+                    <button type="button" id="calTodayBtn" class="btn-ghost-sm">今天</button>
+                    <button type="button" id="calNextBtn" class="btn-ghost-sm" title="下個月">›</button>
+                  </div>
+                </div>
+                <div class="cal-weekdays">
+                  <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                </div>
+                <div id="calGrid" class="cal-grid"></div>
+                <div class="cal-legend">
+                  <span><i class="legend-dot upcoming"></i> 即將到來</span>
+                  <span><i class="legend-dot past"></i> 歷史活動</span>
+                </div>
+              </div>
+
+              <div class="cal-detail-pane">
+                <div class="cal-detail-head">
+                  <span id="calSelectedDateLabel" class="cal-selected-date"></span>
+                  <button type="button" id="calQuickAddBtn" class="btn-ghost-sm">＋ 帶入此日新增</button>
+                </div>
+                <div id="calDetailList" class="cal-detail-list"></div>
+              </div>
+            </div>
+          </div>
           <div class="card">
             <div class="list-controls">
               <div class="sub-tabs">
@@ -722,6 +752,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=5"></script>
+  <script src="script.js?v=6"></script>
 </body>
 </html>

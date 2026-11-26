@@ -31,6 +31,10 @@
   let currentBriefingView = 'today'; // 'today' | 'history'
   let currentTodoView = 'active';
   let currentEventView = 'upcoming';
+  const initNow = new Date();
+  let calYear = initNow.getFullYear();
+  let calMonth = initNow.getMonth(); // 0-11
+  let calSelectedDate = getTodayStr();
   let isMultiSelectMode = false;
   let selectedPlanIds = new Set();
 
@@ -2641,6 +2645,39 @@
       closeModal('eventEditModal');
       showToast('已更新活動資訊');
     });
+    // 小日曆切換與快速帶入日期
+    on('calPrevBtn', 'click', () => {
+      calMonth -= 1;
+      if (calMonth < 0) {
+        calMonth = 11;
+        calYear -= 1;
+      }
+      renderEventCalendar();
+    });
+
+    on('calNextBtn', 'click', () => {
+      calMonth += 1;
+      if (calMonth > 11) {
+        calMonth = 0;
+        calYear += 1;
+      }
+      renderEventCalendar();
+    });
+
+    on('calTodayBtn', 'click', () => {
+      const now = new Date();
+      calYear = now.getFullYear();
+      calMonth = now.getMonth();
+      calSelectedDate = getTodayStr();
+      renderEventCalendar();
+    });
+
+    on('calQuickAddBtn', 'click', () => {
+      document.getElementById('eventDate').value = calSelectedDate;
+      document.getElementById('eventRemindDate').value = calSelectedDate;
+      document.getElementById('eventName').focus();
+      showToast(`已將 ${calSelectedDate} 帶入新增表單`);
+    });
   }
 
   function renderEvents() {
@@ -2784,6 +2821,115 @@
 
     renderList(upcomingAll, 'eventUpcomingList', false);
     renderList(historyAll, 'eventHistoryList', true);
+    renderList(upcomingAll, 'eventUpcomingList', false);
+    renderList(historyAll, 'eventHistoryList', true);
+    renderEventCalendar();
+  }
+
+  function renderEventCalendar() {
+    const grid = document.getElementById('calGrid');
+    const monthLabel = document.getElementById('calMonthLabel');
+    if (!grid || !monthLabel) return;
+
+    const today = getTodayStr();
+    monthLabel.textContent = `${calYear} 年 ${calMonth + 1} 月`;
+
+    // 整理每日活動分類（upcoming / past）
+    const eventMap = {};
+    state.events.forEach(evt => {
+      if (!eventMap[evt.date]) eventMap[evt.date] = { upcoming: 0, past: 0 };
+      if (!evt.archived && evt.date >= today) {
+        eventMap[evt.date].upcoming += 1;
+      } else {
+        eventMap[evt.date].past += 1;
+      }
+    });
+
+    const firstDayWeekday = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+    grid.innerHTML = '';
+
+    for (let i = 0; i < firstDayWeekday; i++) {
+      const emptyCell = document.createElement('div');
+      emptyCell.className = 'cal-day is-empty';
+      grid.appendChild(emptyCell);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const info = eventMap[dateStr];
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cal-day';
+      if (dateStr === today) btn.classList.add('is-today');
+      if (dateStr === calSelectedDate) btn.classList.add('is-selected');
+
+      let dotHtml = '';
+      if (info) {
+        if (info.upcoming > 0) {
+          btn.classList.add('has-upcoming');
+          dotHtml = '<span class="cal-dot upcoming"></span>';
+        } else if (info.past > 0) {
+          btn.classList.add('has-past-only');
+          dotHtml = '<span class="cal-dot past"></span>';
+        }
+      }
+
+      btn.innerHTML = `<span>${d}</span>${dotHtml}`;
+      btn.addEventListener('click', () => {
+        calSelectedDate = dateStr;
+        renderEventCalendar();
+      });
+      grid.appendChild(btn);
+    }
+
+    renderCalendarDetail();
+  }
+
+  function renderCalendarDetail() {
+    const dateLabel = document.getElementById('calSelectedDateLabel');
+    const detailList = document.getElementById('calDetailList');
+    if (!dateLabel || !detailList) return;
+
+    const today = getTodayStr();
+    const [y, m, d] = calSelectedDate.split('-').map(Number);
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const wd = weekdays[new Date(y, m - 1, d).getDay()];
+    dateLabel.textContent = `${calSelectedDate}（週${wd}）`;
+
+    const dayEvents = state.events.filter(e => e.date === calSelectedDate);
+    detailList.innerHTML = '';
+
+    if (dayEvents.length === 0) {
+      detailList.innerHTML = '<div class="empty-state" style="padding:24px 12px;">這一天目前沒有排定活動。</div>';
+      return;
+    }
+
+    dayEvents.forEach(evt => {
+      const isPast = evt.archived || evt.date < today;
+      const item = document.createElement('div');
+      item.className = `cal-detail-item${isPast ? ' is-past' : ''}`;
+
+      const metaParts = [
+        evt.time ? `時間：${evt.time}` : '時間：未填寫',
+        evt.location ? `地點：${evt.location}` : '地點：未填寫'
+      ];
+
+      item.innerHTML = `
+        <div class="cal-detail-top">
+          <span class="cal-detail-title">${escapeHtml(evt.name)}</span>
+          <button type="button" class="text-btn" data-cal-edit>編輯</button>
+        </div>
+        <div class="cal-detail-meta">${escapeHtml(metaParts.join('｜'))}</div>
+        <div class="cal-detail-meta">提醒日：${escapeHtml(evt.remindDate)}${evt.archived ? '（已歸檔）' : ''}</div>
+        ${evt.note ? `<div class="cal-detail-note">備註：${escapeHtml(evt.note)}</div>` : ''}
+      `;
+
+      item.querySelector('[data-cal-edit]').addEventListener('click', () => openEventEditModal(evt));
+      detailList.appendChild(item);
+    });
   }
 
   function openEventEditModal(evt) {
