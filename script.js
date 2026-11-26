@@ -597,8 +597,15 @@
       btn.addEventListener('click', () => closeModal(btn.dataset.close));
     });
     document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+      let startedOnBackdrop = false;
+      backdrop.addEventListener('pointerdown', (e) => {
+        startedOnBackdrop = (e.target === backdrop);
+      });
       backdrop.addEventListener('click', (e) => {
-        if (e.target === backdrop) backdrop.classList.add('hidden');
+        if (startedOnBackdrop && e.target === backdrop) {
+          backdrop.classList.add('hidden');
+        }
+        startedOnBackdrop = false;
       });
     });
   }
@@ -1159,7 +1166,12 @@
         dialogueEl.textContent = state.secretary.lastBriefingText || buildFallbackDialogue(payload);
       }
       if (isManual) {
-        showToast(`AI 彙報失敗：${err.message}`);
+        const isQuota = String(err.message).toLowerCase().includes('quota') || String(err.message).includes('429');
+        showToast(
+          isQuota
+            ? '目前模型的今日免費額度已用完，可至「⚙ AI 設定」切換其他模型'
+            : `AI 彙報失敗：${err.message}`
+        );
       }
     } finally {
       isGeneratingAiBriefing = false;
@@ -1211,28 +1223,21 @@
       return;
     }
 
-    const shouldForceOnLoad = !hasAutoRefreshedOnLoad;
-
-    if (!shouldForceOnLoad && state.secretary.lastBriefingHash === hash && state.secretary.lastBriefingText) {
-      dialogueEl.classList.remove('is-loading');
-      dialogueEl.textContent = state.secretary.lastBriefingText;
+    if (!hasAutoRefreshedOnLoad) {
+      dialogueEl.textContent = state.secretary.lastBriefingText || buildFallbackDialogue(payload);
+      clearTimeout(aiAutoTimer);
+      aiAutoTimer = setTimeout(() => {
+        if (latestBriefingPayload && !hasAutoRefreshedOnLoad && !isGeneratingAiBriefing) {
+          hasAutoRefreshedOnLoad = true;
+          generateAiBriefing(latestBriefingPayload, false);
+        }
+      }, 1500);
       return;
     }
 
     if (!isGeneratingAiBriefing) {
+      dialogueEl.classList.remove('is-loading');
       dialogueEl.textContent = state.secretary.lastBriefingText || buildFallbackDialogue(payload);
-      if (shouldForceOnLoad || lastFailedBriefingHash !== hash) {
-        clearTimeout(aiAutoTimer);
-        aiAutoTimer = setTimeout(() => {
-          if (
-            latestBriefingPayload &&
-            (!hasAutoRefreshedOnLoad || state.secretary.lastBriefingHash !== latestBriefingPayload.hash)
-          ) {
-            hasAutoRefreshedOnLoad = true;
-            generateAiBriefing(latestBriefingPayload, false);
-          }
-        }, 1000);
-      }
     }
   }
 
