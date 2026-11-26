@@ -2302,3 +2302,14 @@ input[type="color"] {
 .cal-selected-date {
   color: var(--ink-primary);
 }
+
+/* ==================== 補上小日曆星期網格排版 ==================== */
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--ink-secondary);
+  margin-bottom: 6px;
+  font-weight: 500;
+}

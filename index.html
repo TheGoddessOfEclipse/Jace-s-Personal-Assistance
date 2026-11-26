@@ -298,36 +298,6 @@
         </aside>
 
         <div class="list-panel">
-          <div class="card event-calendar-card">
-            <div class="event-cal-layout">
-              <div class="cal-box">
-                <div class="cal-header">
-                  <h3 id="calMonthLabel"></h3>
-                  <div class="cal-nav">
-                    <button type="button" id="calPrevBtn" class="btn-ghost-sm" title="上個月">‹</button>
-                    <button type="button" id="calTodayBtn" class="btn-ghost-sm">今天</button>
-                    <button type="button" id="calNextBtn" class="btn-ghost-sm" title="下個月">›</button>
-                  </div>
-                </div>
-                <div class="cal-weekdays">
-                  <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
-                </div>
-                <div id="calGrid" class="cal-grid"></div>
-                <div class="cal-legend">
-                  <span><i class="legend-dot upcoming"></i> 即將到來</span>
-                  <span><i class="legend-dot past"></i> 歷史活動</span>
-                </div>
-              </div>
-
-              <div class="cal-detail-pane">
-                <div class="cal-detail-head">
-                  <span id="calSelectedDateLabel" class="cal-selected-date"></span>
-                  <button type="button" id="calQuickAddBtn" class="btn-ghost-sm">＋ 帶入此日新增</button>
-                </div>
-                <div id="calDetailList" class="cal-detail-list"></div>
-              </div>
-            </div>
-          </div>
           <div class="card">
             <div class="list-controls">
               <div class="sub-tabs">
@@ -358,7 +328,6 @@
       </div>
     </section>
 
-    <!-- ==================== 第三部分：活動提醒平台 ==================== -->
     <!-- ==================== 第三部分：活動提醒平台 ==================== -->
     <section id="tab-event" class="tab-panel">
       <!-- 上方：小日曆與當日詳情面板 -->
@@ -457,7 +426,7 @@
     </section>
   </main>
 
-  <!-- ==================== Modal 1：教學事項詳情與編輯 ==================== -->
+  <!-- ==================== Modals ==================== -->
   <div id="planModal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -504,7 +473,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 2：新增／重命名班級 ==================== -->
   <div id="classModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
       <div class="modal-header">
@@ -525,7 +493,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 3：任務來源管理 ==================== -->
   <div id="sourceModal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -546,7 +513,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 4：編輯待辦事項 ==================== -->
   <div id="todoEditModal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -585,7 +551,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 5：編輯活動提醒 ==================== -->
   <div id="eventEditModal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -630,7 +595,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 6：首頁待辦處理詢問 ==================== -->
   <div id="todoResolveModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
       <div class="modal-header">
@@ -657,7 +621,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 7：首頁非當天活動提醒處理 ==================== -->
   <div id="eventResolveModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
       <div class="modal-header">
@@ -706,7 +669,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 8：個人秘書頭像裁切與縮放 ==================== -->
   <div id="avatarCropModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
       <div class="modal-header">
@@ -739,7 +701,6 @@
     </div>
   </div>
 
-  <!-- ==================== Modal 9：AI 個人秘書設定 ==================== -->
   <div id="secretarySettingsModal" class="modal-backdrop hidden">
     <div class="modal-card">
       <div class="modal-header">
@@ -760,7 +721,7 @@
           <span class="hint">留空時會自動使用內建統計台詞。</span>
         </div>
         <div class="field">
-          <label for="secModelSelect">使用模型</label>
+          <label for="secModelSelect">use model</label>
           <select id="secModelSelect">
             <option value="gemini-2.5-flash">gemini-2.5-flash（推薦・聰明且快速）</option>
             <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite（輕量極速）</option>
@@ -786,6 +747,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=6"></script>
+  <script src="script.js?v=7"></script>
 </body>
 </html>
