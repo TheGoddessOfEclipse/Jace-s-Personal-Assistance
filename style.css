@@ -1623,3 +1623,32 @@ input[type="color"] {
     width: 82px;
   }
 }
+
+/* ==================== Firebase 同步狀態標籤 ==================== */
+.sync-pill {
+  font-size: 12px;
+  padding: 5px 11px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.sync-pill.synced {
+  background: var(--accent-soft);
+  border-color: #C7D6C8;
+  color: var(--accent);
+}
+
+.sync-pill.syncing {
+  background: #FAF3E3;
+  border-color: #E6D3A7;
+  color: #8C6D2E;
+}
+
+.sync-pill.error {
+  background: #FDF2F2;
+  border-color: #E3C2C2;
+  color: var(--danger);
+}

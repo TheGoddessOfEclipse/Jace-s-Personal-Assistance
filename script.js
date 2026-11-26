@@ -1,6 +1,31 @@
 (() => {
   const STORAGE_KEY = 'teacher_admin_journal_v1';
 
+  // ==================== Firebase 設定（請替換為你的專案設定） ====================
+  const firebaseConfig = {
+    apiKey: "AIzaSyAp9o7K0rBQgwSMg58e4C1FXy2UZjfCSv4",
+    authDomain: "jace-s-teaching-lab.firebaseapp.com",
+    databaseURL: "https://jace-s-teaching-lab-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "jace-s-teaching-lab",
+    storageBucket: "jace-s-teaching-lab.firebasestorage.app",
+    messagingSenderId: "222352360644",
+    appId: "1:222352360644:web:693d06971123e5afbcf591"
+  };
+
+  // 資料存放的雲端節點路徑（若要與其他專案共用同一個 Firebase，改這裡即可區隔）
+  const FIREBASE_PATH = 'jace_personal_assistant/state';
+
+  let dbRef = null;
+  let isFirebaseReady = false;
+  let saveTimer = null;
+
+  function setSyncStatus(statusType, text) {
+    const badge = document.getElementById('syncStatusBadge');
+    if (!badge) return;
+    badge.className = `sync-pill ${statusType}`;
+    badge.textContent = text;
+  }
+
   // ==================== 初始預設資料 ====================
   function createDefaultClass(name = '英文 A 班', weeks = 6, periods = 4) {
     return {
@@ -38,6 +63,12 @@
   // ==================== 工具函式 ====================
   function uid(prefix = 'id') {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  function toArray(val) {
+    if (Array.isArray(val)) return val.filter(Boolean);
+    if (val && typeof val === 'object') return Object.values(val).filter(Boolean);
+    return [];
   }
 
   function getTodayStr() {
@@ -86,24 +117,42 @@
     }, 2300);
   }
 
-  // ==================== 資料載入與相容轉換 ====================
+  // ==================== 資料載入、Firebase 空陣列防護與跨日處理 ====================
   function migrateAndNormalizeState(parsed) {
     const base = createDefaultState();
     if (!parsed || typeof parsed !== 'object') return base;
 
     let teaching;
-    if (parsed.teaching && Array.isArray(parsed.teaching.classes) && parsed.teaching.classes.length > 0) {
-      teaching = parsed.teaching;
-      if (!teaching.classes.some(c => c.id === teaching.activeClassId)) {
-        teaching.activeClassId = teaching.classes[0].id;
-      }
-    } else if (parsed.teaching && Array.isArray(parsed.teaching.items)) {
+    const rawClasses = parsed.teaching ? toArray(parsed.teaching.classes) : [];
+    if (rawClasses.length > 0) {
+      const normalizedClasses = rawClasses.map(c => ({
+        id: c.id || uid('cls'),
+        name: c.name || '未命名班級',
+        weeks: Math.max(1, parseInt(c.weeks, 10) || 6),
+        periods: Math.max(1, parseInt(c.periods, 10) || 4),
+        pinnedSlot: c.pinnedSlot || null,
+        items: toArray(c.items).map(item => ({
+          id: item.id || uid('plan'),
+          name: item.name || '',
+          type: item.type || '',
+          color: item.color || '#DDE6D5',
+          desc: item.desc || '',
+          completed: !!item.completed,
+          completedAt: item.completedAt || null,
+          location: item.location || { type: 'staging' }
+        }))
+      }));
+      const activeId = normalizedClasses.some(c => c.id === parsed.teaching.activeClassId)
+        ? parsed.teaching.activeClassId
+        : normalizedClasses[0].id;
+      teaching = { activeClassId: activeId, classes: normalizedClasses };
+    } else if (parsed.teaching && toArray(parsed.teaching.items).length > 0) {
       const migratedClass = createDefaultClass(
         '英文 A 班',
         parsed.teaching.weeks || 6,
         parsed.teaching.periods || 4
       );
-      migratedClass.items = parsed.teaching.items.map(item => ({
+      migratedClass.items = toArray(parsed.teaching.items).map(item => ({
         ...item,
         completedAt: item.completedAt || null
       }));
@@ -119,49 +168,155 @@
       name: (parsed.secretary && parsed.secretary.name) || base.secretary.name,
       avatar: (parsed.secretary && parsed.secretary.avatar) || ''
     };
-    const sources = parsed.sources && parsed.sources.length ? parsed.sources : base.sources;
-    const todos = Array.isArray(parsed.todos) ? parsed.todos : [];
-    const events = Array.isArray(parsed.events) ? parsed.events : [];
 
-    const normalized = { secretary, teaching, sources, todos, events };
-    normalizeDailyStates(normalized);
-    return normalized;
+    const rawSources = toArray(parsed.sources);
+    const sources = rawSources.length ? rawSources : base.sources;
+    const todos = toArray(parsed.todos).map(t => ({
+      id: t.id || uid('todo'),
+      date: t.date || getTodayStr(),
+      title: t.title || '',
+      sourceId: t.sourceId || sources[0].id,
+      content: t.content || '',
+      note: t.note || '',
+      status: t.status || 'not_started',
+      todayDoneDate: t.todayDoneDate || null,
+      lastWorkedDate: t.lastWorkedDate || null,
+      completedAt: t.completedAt || null
+    }));
+
+    const events = toArray(parsed.events).map(e => ({
+      id: e.id || uid('evt'),
+      name: e.name || '',
+      date: e.date || getTodayStr(),
+      remindDate: e.remindDate || e.date || getTodayStr(),
+      time: e.time || '',
+      location: e.location || '',
+      note: e.note || '',
+      archived: !!e.archived,
+      archivedAt: e.archivedAt || null
+    }));
+
+    return { secretary, teaching, sources, todos, events };
   }
 
   function normalizeDailyStates(targetState) {
     const today = getTodayStr();
+    let changed = false;
     targetState.todos.forEach(todo => {
       if (todo.status === 'today_done') {
         if (!todo.todayDoneDate) {
           todo.todayDoneDate = today;
+          changed = true;
         } else if (todo.todayDoneDate < today) {
           todo.lastWorkedDate = todo.todayDoneDate;
           todo.status = 'not_started';
           todo.todayDoneDate = null;
+          changed = true;
         }
       }
     });
+    return changed;
   }
 
-  function loadState() {
+  function loadLocalState() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return createDefaultState();
-      return migrateAndNormalizeState(JSON.parse(raw));
+      const loaded = migrateAndNormalizeState(JSON.parse(raw));
+      normalizeDailyStates(loaded);
+      return loaded;
     } catch {
       return createDefaultState();
     }
   }
 
-  let state = loadState();
+  let state = loadLocalState();
   let currentTodoView = 'active';
   let currentEventView = 'upcoming';
+
+  // ==================== 儲存與 Firebase 即時同步 ====================
+  function pushToCloud() {
+    if (!isFirebaseReady || !dbRef) return;
+    setSyncStatus('syncing', '↻ 同步中...');
+    const payload = JSON.parse(JSON.stringify(state));
+    dbRef.set(payload)
+      .then(() => {
+        setSyncStatus('synced', '☁️ 雲端已同步');
+      })
+      .catch((err) => {
+        console.error('Firebase 寫入失敗:', err);
+        setSyncStatus('error', '⚠️ 同步失敗');
+        showToast('寫入雲端失敗，請檢查網路或 Firebase 資料庫規則');
+      });
+  }
 
   function saveState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      showToast('儲存空間已滿，建議縮小秘書圖像檔案或匯出備份');
+      showToast('本機快取空間已滿，建議縮小秘書圖像檔案');
+    }
+
+    if (isFirebaseReady && dbRef) {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(pushToCloud, 180);
+    }
+  }
+
+  function initFirebase() {
+    const isConfigured =
+      typeof firebase !== 'undefined' &&
+      firebaseConfig.databaseURL &&
+      !firebaseConfig.databaseURL.includes('貼上你的') &&
+      !firebaseConfig.apiKey.includes('貼上你的');
+
+    if (!isConfigured) {
+      setSyncStatus('local', '本機模式（未設 Firebase）');
+      return;
+    }
+
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      const db = firebase.database();
+      dbRef = db.ref(FIREBASE_PATH);
+      isFirebaseReady = true;
+      setSyncStatus('syncing', '連線雲端中...');
+
+      dbRef.on(
+        'value',
+        (snapshot) => {
+          const cloudData = snapshot.val();
+          if (!cloudData) {
+            // 雲端尚無資料時，自動把目前本機資料上傳初始化
+            pushToCloud();
+            return;
+          }
+
+          state = migrateAndNormalizeState(cloudData);
+          const dailyChanged = normalizeDailyStates(state);
+
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          } catch {}
+
+          renderAll();
+          setSyncStatus('synced', '☁️ 雲端已同步');
+
+          if (dailyChanged) {
+            pushToCloud();
+          }
+        },
+        (err) => {
+          console.error('Firebase 讀取錯誤:', err);
+          setSyncStatus('error', '⚠️ 雲端連線失敗');
+          showToast('無法讀取 Firebase，請確認資料庫規則與網址是否正確');
+        }
+      );
+    } catch (err) {
+      console.error('Firebase 初始化錯誤:', err);
+      setSyncStatus('error', '⚠️ Firebase 設定有誤');
     }
   }
 
@@ -222,9 +377,10 @@
           const imported = JSON.parse(reader.result);
           if (!imported.teaching || !imported.sources) throw new Error('格式不符');
           state = migrateAndNormalizeState(imported);
+          normalizeDailyStates(state);
           saveState();
           renderAll();
-          showToast('資料已成功還原');
+          showToast('資料已成功還原並同步');
         } catch {
           alert('匯入失敗：請確認檔案為本系統匯出的 JSON 備份檔。');
         }
@@ -295,7 +451,6 @@
 
   // ==================== 首頁：RPG 個人秘書與整合條列 Briefing ====================
   function initBriefing() {
-    // 點擊立繪框上傳圖像（自動縮放並保留透明 PNG 背景）
     const portraitBox = document.getElementById('rpgPortraitBox');
     const avatarInput = document.getElementById('rpgAvatarInput');
 
@@ -308,7 +463,8 @@
       reader.onload = () => {
         const img = new Image();
         img.onload = () => {
-          const maxSize = 520;
+          // 縮放至 400px 內，保留透明 PNG 並確保 Firebase 同步快速
+          const maxSize = 400;
           let { width, height } = img;
           if (width > maxSize || height > maxSize) {
             const ratio = Math.min(maxSize / width, maxSize / height);
@@ -321,7 +477,7 @@
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
           const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-          state.secretary.avatar = canvas.toDataURL(mime, 0.88);
+          state.secretary.avatar = canvas.toDataURL(mime, 0.85);
           saveState();
           renderSecretaryBox();
           showToast('已更新個人秘書圖像');
@@ -332,7 +488,6 @@
       avatarInput.value = '';
     });
 
-    // 修改秘書名稱
     document.getElementById('rpgEditNameBtn').addEventListener('click', () => {
       const nextName = prompt('請輸入個人秘書的名稱或稱呼：', state.secretary.name);
       if (nextName === null) return;
@@ -344,7 +499,6 @@
       showToast('已更新秘書稱呼');
     });
 
-    // 移除圖像
     document.getElementById('rpgResetAvatarBtn').addEventListener('click', () => {
       if (!confirm('確定要移除目前的秘書圖像嗎？')) return;
       state.secretary.avatar = '';
@@ -353,7 +507,6 @@
       showToast('已移除秘書圖像');
     });
 
-    // 待辦處理詢問 Modal 按鈕
     document.getElementById('resolveTodayDoneBtn').addEventListener('click', () => {
       const id = document.getElementById('resolveTodoId').value;
       const todo = state.todos.find(t => t.id === id);
@@ -433,7 +586,6 @@
   }
 
   function renderBriefing() {
-    normalizeDailyStates(state);
     const today = getTodayStr();
     const listEl = document.getElementById('briefingUnifiedList');
     listEl.innerHTML = '';
@@ -441,7 +593,7 @@
     let teachingPending = 0;
     let rowCount = 0;
 
-    // 1. 收集教學進度（各班今日進度 + 下堂課進度）
+    // 1. 教學進度（各班今日進度 + 下堂課進度）
     state.teaching.classes.forEach(cls => {
       const { todaySlot, nextSlot } = getClassLessonBriefing(cls);
 
@@ -519,7 +671,7 @@
       }
     });
 
-    // 2. 收集活動提醒（七日內）
+    // 2. 活動提醒（七日內）
     const upcoming7Days = state.events
       .filter(e => !e.archived && e.date >= today && diffDays(today, e.date) <= 7)
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -566,7 +718,7 @@
       listEl.appendChild(li);
     });
 
-    // 3. 收集待辦事項（全列，排除今日已標記「今日進度已完成」者）
+    // 3. 待辦事項（全列，排除今日已標記「今日進度已完成」者）
     const visibleTodos = state.todos.filter(
       t => t.status !== 'completed' && !(t.status === 'today_done' && t.todayDoneDate === today)
     );
@@ -1212,7 +1364,6 @@
   }
 
   function renderTodos() {
-    normalizeDailyStates(state);
     const filterSource = document.getElementById('todoFilterSource').value;
     const filterStatus = document.getElementById('todoFilterStatus').value;
     const keyword = document.getElementById('todoSearchInput').value.trim().toLowerCase();
@@ -1578,7 +1729,6 @@
 
   // ==================== 啟動渲染 ====================
   function renderAll() {
-    normalizeDailyStates(state);
     renderTeaching();
     renderSourceOptions();
     renderTodos();
@@ -1592,4 +1742,5 @@
   initTodo();
   initEvents();
   renderAll();
+  initFirebase();
 })();

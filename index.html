@@ -18,6 +18,7 @@
       </div>
       <div class="header-meta">
         <span id="todayDateDisplay" class="today-pill"></span>
+        <span id="syncStatusBadge" class="sync-pill local">本機模式</span>
         <div class="backup-actions">
           <button type="button" id="exportDataBtn" class="btn-ghost" title="匯出資料備份">匯出備份</button>
           <button type="button" id="importDataBtn" class="btn-ghost" title="還原資料備份">匯入還原</button>
@@ -514,6 +515,9 @@
   </div>
 
   <div id="toastContainer" class="toast-container"></div>
+  
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
