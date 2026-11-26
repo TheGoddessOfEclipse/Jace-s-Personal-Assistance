@@ -1088,12 +1088,9 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: promptText }] }],
-          generationConfig: {
-            temperature: 0.75,
-            maxOutputTokens: 1200
-          }
-        })
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig
+          })
       });
 
       const data = await res.json();
