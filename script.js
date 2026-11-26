@@ -950,11 +950,12 @@
       const id = document.getElementById('resolveEventId').value;
       const evt = state.events.find(e => e.id === id);
       if (!evt) return;
-      evt.snoozeUntil = null;
+      const tomorrow = addDays(getTodayStr(), 1);
+      evt.snoozeUntil = tomorrow;
       saveState();
       closeModal('eventResolveModal');
       renderAll();
-      showToast(`「${evt.name}」將持續於 Today's Briefing 提醒`);
+      showToast(`「${evt.name}」今日不再提醒，明日（${tomorrow}）起將持續提醒`);
     });
 
     on('resolveEventArchiveBtn', 'click', () => {
