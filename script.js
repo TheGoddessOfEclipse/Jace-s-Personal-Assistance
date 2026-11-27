@@ -40,6 +40,12 @@
   let calSelectedDate = getTodayStr();
   let isMultiSelectMode = false;
   let selectedPlanIds = new Set();
+  let movingPlanId = null;
+  let isStagingDockCollapsed = false;
+
+  function isMobileOrTouch() {
+    return window.matchMedia('(max-width: 960px), (pointer: coarse)').matches;
+  }
 
   let isGeneratingAiBriefing = false;
   let hasAutoRefreshedOnLoad = false;
@@ -1890,8 +1896,89 @@
   // ==================== 第一部分：教學進度平台（多班級、編輯、複製、多選批次複製） ====================
   function setMultiSelectMode(enabled) {
     isMultiSelectMode = enabled;
+    if (enabled) movingPlanId = null;
     if (!enabled) selectedPlanIds.clear();
     renderTeaching();
+  }
+
+  function cancelMovingPlan() {
+    if (!movingPlanId) return;
+    movingPlanId = null;
+    renderTeaching();
+  }
+
+  function movePlanItemToLocation(itemId, location) {
+    const cls = getActiveClass();
+    const item = cls.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    if (location.type === 'staging') {
+      item.location = { type: 'staging' };
+      item.completed = false;
+      item.completedAt = null;
+    } else if (location.type === 'cell') {
+      item.location = {
+        type: 'cell',
+        week: location.week,
+        period: location.period
+      };
+    }
+
+    cls.items = cls.items.filter(i => i.id !== itemId);
+    cls.items.push(item);
+    movingPlanId = null;
+    saveState();
+    renderTeaching();
+    renderBriefing();
+
+    if (location.type === 'staging') {
+      showToast(`已將「${item.name}」移回待排區`);
+    } else {
+      showToast(`已將「${item.name}」排入第 ${location.week} 週第 ${location.period} 節`);
+    }
+  }
+
+  function renderMobileMoveBanner(cls) {
+    const banner = document.getElementById('mobileMoveBanner');
+    if (!banner) return;
+
+    if (!movingPlanId) {
+      banner.classList.add('hidden');
+      banner.innerHTML = '';
+      return;
+    }
+
+    const item = cls.items.find(i => i.id === movingPlanId);
+    if (!item) {
+      movingPlanId = null;
+      banner.classList.add('hidden');
+      banner.innerHTML = '';
+      return;
+    }
+
+    const isInTable = item.location && item.location.type === 'cell';
+    banner.classList.remove('hidden');
+    banner.innerHTML = `
+      <div class="mobile-move-text">
+        <strong>排課中：${escapeHtml(item.name)}</strong>
+        <span>請自由滑動課表，直接點擊要放入的節次格子</span>
+      </div>
+      <div class="mobile-move-actions">
+        ${isInTable ? '<button type="button" id="mobileMoveToStagingBtn" class="btn-ghost-sm">退回待排區</button>' : ''}
+        <button type="button" id="mobileMoveCancelBtn" class="btn-primary btn-sm">取消</button>
+      </div>
+    `;
+
+    const toStagingBtn = document.getElementById('mobileMoveToStagingBtn');
+    if (toStagingBtn) {
+      toStagingBtn.addEventListener('click', () => {
+        movePlanItemToLocation(item.id, { type: 'staging' });
+      });
+    }
+    const cancelBtn = document.getElementById('mobileMoveCancelBtn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', cancelMovingPlan);
+    }
   }
 
   function duplicatePlanItems(itemIds, targetClassId = null) {
@@ -1930,6 +2017,23 @@
   }
 
   function initTeaching() {
+    on('toggleStagingDockBtn', 'click', () => {
+      isStagingDockCollapsed = !isStagingDockCollapsed;
+      const box = document.querySelector('.staging-box');
+      const btn = document.getElementById('toggleStagingDockBtn');
+      if (box) box.classList.toggle('is-collapsed', isStagingDockCollapsed);
+      if (btn) btn.textContent = isStagingDockCollapsed ? '展開' : '收合';
+    });
+
+    on('stagingList', 'click', (e) => {
+      if (!movingPlanId) return;
+      if (e.target.closest('.plan-chip')) return;
+      const cls = getActiveClass();
+      const item = cls.items.find(i => i.id === movingPlanId);
+      if (item && item.location && item.location.type === 'cell') {
+        movePlanItemToLocation(movingPlanId, { type: 'staging' });
+      }
+    });
     on('toggleMultiSelectBtn', 'click', () => setMultiSelectMode(!isMultiSelectMode));
     on('stagingMultiBtn', 'click', () => setMultiSelectMode(!isMultiSelectMode));
     on('exitMultiSelectBtn', 'click', () => setMultiSelectMode(false));
@@ -2171,9 +2275,10 @@
     const isInTable = item.location && item.location.type === 'cell';
     const isCompleted = isInTable && !!item.completed;
     const isSelected = selectedPlanIds.has(item.id);
+    const isMoving = movingPlanId === item.id;
     const hasDesc = !!(item.desc && item.desc.trim());
     const chip = document.createElement('div');
-    chip.className = `plan-chip${isCompleted ? ' completed' : ''}${isMultiSelectMode ? ' multi-selectable' : ''}${isSelected ? ' is-selected' : ''}${hasDesc ? ' has-desc' : ''}`;
+    chip.className = `plan-chip${isCompleted ? ' completed' : ''}${isMultiSelectMode ? ' multi-selectable' : ''}${isSelected ? ' is-selected' : ''}${isMoving ? ' is-moving' : ''}${hasDesc ? ' has-desc' : ''}`;
     chip.dataset.itemId = item.id;
     chip.style.backgroundColor = item.color;
     chip.style.color = getContrastColor(item.color);
@@ -2193,6 +2298,7 @@
         ${item.type ? `<span class="chip-type">${escapeHtml(item.type)}</span>` : ''}
         ${!isMultiSelectMode ? `
           <span class="chip-actions">
+            ${isInTable ? '<button type="button" class="chip-action-btn chip-move-btn" data-chip-move title="移動至其他節次">⇄</button>' : ''}
             <button type="button" class="chip-action-btn" data-chip-edit title="編輯此項目">✎</button>
             <button type="button" class="chip-action-btn" data-chip-copy title="複製此項目至待排區">❐</button>
           </span>
@@ -2201,8 +2307,18 @@
       ${hasDesc ? `<div class="chip-desc">${escapeHtml(item.desc)}</div>` : ''}
     `;
 
+    const moveBtn = chip.querySelector('[data-chip-move]');
     const editBtn = chip.querySelector('[data-chip-edit]');
     const copyBtn = chip.querySelector('[data-chip-copy]');
+
+    if (moveBtn) {
+      moveBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+      moveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        movingPlanId = (movingPlanId === item.id) ? null : item.id;
+        renderTeaching();
+      });
+    }
 
     if (editBtn) {
       editBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -2240,20 +2356,74 @@
       return;
     }
 
+    if (movingPlanId) {
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cls = getActiveClass();
+        const clickedItem = cls.items.find(i => i.id === itemId);
+        if (!clickedItem) return;
+
+        if (clickedItem.location && clickedItem.location.type === 'cell') {
+          if (itemId === movingPlanId) {
+            cancelMovingPlan();
+          } else {
+            movePlanItemToLocation(movingPlanId, {
+              type: 'cell',
+              week: clickedItem.location.week,
+              period: clickedItem.location.period
+            });
+          }
+        } else {
+          movingPlanId = (movingPlanId === itemId) ? null : itemId;
+          renderTeaching();
+        }
+      });
+      return;
+    }
+
     chip.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 && e.pointerType === 'mouse') return;
       if (e.target.closest('.chip-actions')) return;
 
+      const isTouch = e.pointerType !== 'mouse';
       const startX = e.clientX;
       const startY = e.clientY;
+      let lastClientX = startX;
+      let lastClientY = startY;
       let isDragging = false;
       let ghost = null;
       let currentDropZone = null;
       let longPressTimer = null;
+      let autoScrollRaf = null;
+
+      const onTouchMove = (te) => {
+        if (isDragging) te.preventDefault();
+      };
+
+      const runAutoScroll = () => {
+        if (!isDragging) return;
+        const edge = 90;
+        const maxSpeed = 12;
+        let delta = 0;
+        if (lastClientY < edge) {
+          delta = -Math.ceil(((edge - lastClientY) / edge) * maxSpeed);
+        } else if (lastClientY > window.innerHeight - edge) {
+          delta = Math.ceil(((lastClientY - (window.innerHeight - edge)) / edge) * maxSpeed);
+        }
+        if (delta !== 0) {
+          window.scrollBy(0, delta);
+          moveGhost(lastClientX, lastClientY);
+        }
+        autoScrollRaf = requestAnimationFrame(runAutoScroll);
+      };
 
       const beginDrag = (clientX, clientY) => {
         if (isDragging) return;
         isDragging = true;
+        if (isTouch) {
+          document.body.classList.add('is-touch-dragging');
+          if (navigator.vibrate) navigator.vibrate(15);
+        }
         chip.classList.add('dragging-source');
 
         ghost = chip.cloneNode(true);
@@ -2262,9 +2432,12 @@
         ghost.style.width = `${chip.offsetWidth}px`;
         document.body.appendChild(ghost);
         moveGhost(clientX, clientY);
+        autoScrollRaf = requestAnimationFrame(runAutoScroll);
       };
 
       const moveGhost = (clientX, clientY) => {
+        lastClientX = clientX;
+        lastClientY = clientY;
         if (!ghost) return;
         ghost.style.left = `${clientX - ghost.offsetWidth / 2}px`;
         ghost.style.top = `${clientY - ghost.offsetHeight / 2}px`;
@@ -2284,9 +2457,10 @@
       const onPointerMove = (moveEvent) => {
         const dist = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
         if (!isDragging) {
-          if (dist > 8) {
+          const threshold = isTouch ? 12 : 8;
+          if (dist > threshold) {
             clearTimeout(longPressTimer);
-            if (e.pointerType === 'mouse') {
+            if (!isTouch) {
               beginDrag(moveEvent.clientX, moveEvent.clientY);
             } else {
               cleanup();
@@ -2303,29 +2477,30 @@
 
         if (isDragging) {
           if (currentDropZone) {
-            const cls = getActiveClass();
             const dropType = currentDropZone.dataset.dropType;
-            const item = cls.items.find(i => i.id === itemId);
-            if (item) {
-              if (dropType === 'staging') {
-                item.location = { type: 'staging' };
-                item.completed = false;
-                item.completedAt = null;
-              } else if (dropType === 'cell') {
-                item.location = {
-                  type: 'cell',
-                  week: parseInt(currentDropZone.dataset.week, 10),
-                  period: parseInt(currentDropZone.dataset.period, 10)
-                };
-              }
-              cls.items = cls.items.filter(i => i.id !== itemId);
-              cls.items.push(item);
-              saveState();
-              renderTeaching();
-              renderBriefing();
+            if (dropType === 'staging') {
+              movePlanItemToLocation(itemId, { type: 'staging' });
+            } else if (dropType === 'cell') {
+              movePlanItemToLocation(itemId, {
+                type: 'cell',
+                week: parseInt(currentDropZone.dataset.week, 10),
+                period: parseInt(currentDropZone.dataset.period, 10)
+              });
             }
           }
         } else {
+          const cls = getActiveClass();
+          const item = cls.items.find(i => i.id === itemId);
+          const isStaging = item && (!item.location || item.location.type !== 'cell');
+
+          // 手機／平板點一下待排項目：直接進入「點選排課」模式（電腦滑鼠不觸發）
+          if (isStaging && (isTouch || isMobileOrTouch())) {
+            movingPlanId = itemId;
+            renderTeaching();
+            cleanup();
+            return;
+          }
+
           if (clickTracker.id === itemId && clickTracker.timer) {
             clearTimeout(clickTracker.timer);
             clickTracker = { id: null, timer: null };
@@ -2345,17 +2520,21 @@
 
       const cleanup = () => {
         clearTimeout(longPressTimer);
+        if (autoScrollRaf) cancelAnimationFrame(autoScrollRaf);
         if (ghost) ghost.remove();
         if (currentDropZone) currentDropZone.classList.remove('drag-over');
         chip.classList.remove('dragging-source');
+        document.body.classList.remove('is-touch-dragging');
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('pointercancel', cleanup);
+        if (isTouch) window.removeEventListener('touchmove', onTouchMove);
       };
 
       window.addEventListener('pointermove', onPointerMove, { passive: false });
       window.addEventListener('pointerup', onPointerUp);
       window.addEventListener('pointercancel', cleanup);
+      if (isTouch) window.addEventListener('touchmove', onTouchMove, { passive: false });
     });
   }
 
@@ -2430,7 +2609,7 @@
       btn.textContent = c.name;
       btn.addEventListener('click', () => {
         state.teaching.activeClassId = c.id;
-        selectedPlanIds.clear();
+        movingPlanId = null;
         saveState();
         renderTeaching();
       });
@@ -2479,6 +2658,12 @@ if (weekdayBar) {
     const stagingItems = cls.items.filter(i => i.location.type === 'staging');
     document.getElementById('stagingCount').textContent = stagingItems.length;
 
+    if (movingPlanId && !cls.items.some(i => i.id === movingPlanId)) {
+      movingPlanId = null;
+    }
+    const movingItem = movingPlanId ? cls.items.find(i => i.id === movingPlanId) : null;
+    stagingList.classList.toggle('is-place-target', !!(movingItem && movingItem.location && movingItem.location.type === 'cell'));
+    renderMobileMoveBanner(cls);
     if (stagingItems.length === 0) {
       stagingList.innerHTML = '<div class="empty-drop-hint">尚無待排事項，可於上方新增或由表格拖回此處</div>';
     } else {
@@ -2557,7 +2742,12 @@ for (let w = 1; w <= cls.weeks; w++) {
       i => i.location.type === 'cell' && i.location.week === w && i.location.period === p
     );
     cellItems.forEach(item => itemsWrap.appendChild(createPlanChip(item)));
-
+    if (movingPlanId) {
+       tdContent.classList.add('is-place-target');
+       tdContent.addEventListener('click', () => {
+         movePlanItemToLocation(movingPlanId, { type: 'cell', week: w, period: p });
+       });
+     }
     tdContent.appendChild(itemsWrap);
     tr.appendChild(tdContent);
     tbody.appendChild(tr);

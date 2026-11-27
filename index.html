@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=3" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -208,6 +208,9 @@
         </div>
       </div>
 
+      <!-- 手機／平板點選排課浮動提示條 -->
+      <div id="mobileMoveBanner" class="mobile-move-banner hidden"></div>
+
       <div class="teaching-layout">
         <aside class="staging-sidebar">
           <div class="card">
@@ -249,7 +252,10 @@
                 <h3>待排區</h3>
                 <span id="stagingCount" class="count-pill">0</span>
               </div>
-              <button type="button" id="stagingMultiBtn" class="btn-ghost-sm">☑ 多選</button>
+              <div class="staging-header-right">
+                <button type="button" id="stagingMultiBtn" class="btn-ghost-sm">☑ 多選</button>
+                <button type="button" id="toggleStagingDockBtn" class="btn-ghost-sm mobile-only-btn">收合</button>
+              </div>
             </div>
             <div id="stagingList" class="drop-zone staging-list" data-drop-type="staging"></div>
           </div>
@@ -797,5 +803,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=17"></script></body>
+  <script src="script.js?v=18"></script></body>
 </html>

@@ -2433,3 +2433,171 @@ input[type="color"] {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ==================== 教學進度平台：手機與平板專用互動與版面（不影響電腦版） ==================== */
+.plan-chip {
+  -webkit-touch-callout: none;
+}
+
+body.is-touch-dragging {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.staging-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 電腦版隱藏專用按鈕 */
+.mobile-only-btn,
+.chip-move-btn {
+  display: none;
+}
+
+/* 點選排課中的浮動提示與目標高亮 */
+.mobile-move-banner {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 80;
+  background: var(--ink-primary);
+  color: #FFFFFF;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mobile-move-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.mobile-move-text span {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.mobile-move-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-move-banner .btn-ghost-sm {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.plan-chip.is-moving {
+  outline: 2.5px solid var(--terracotta);
+  outline-offset: 2px;
+  box-shadow: 0 4px 12px rgba(194, 122, 99, 0.35);
+}
+
+.drop-cell.is-place-target {
+  background: #F4F8F3;
+  outline: 1.5px dashed var(--accent);
+  outline-offset: -3px;
+  cursor: pointer;
+}
+
+.staging-list.is-place-target {
+  background: var(--terracotta-soft);
+  border-color: var(--terracotta);
+}
+
+/* 觸控裝置（含橫式平板）與窄螢幕：顯示課表項目的 ⇄ 移動按鈕 */
+@media (max-width: 960px), (pointer: coarse) {
+  .chip-move-btn {
+    display: inline-flex;
+  }
+}
+
+/* 手機與直式平板：待排區固定為底部可收合浮動條，不影響電腦雙欄 */
+@media (max-width: 960px) {
+  .mobile-only-btn {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .teaching-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .staging-sidebar {
+    display: contents;
+  }
+
+  .staging-sidebar > .card:not(.staging-box) {
+    order: 1;
+  }
+
+  .table-section {
+    order: 2;
+  }
+
+  .staging-box {
+    order: 3;
+    position: sticky;
+    bottom: 8px;
+    z-index: 35;
+    padding: 12px 14px;
+    border: 1.5px solid var(--accent);
+    box-shadow: 0 -6px 20px rgba(51, 48, 46, 0.14);
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(6px);
+  }
+
+  .staging-box .staging-header {
+    margin-bottom: 8px;
+  }
+
+  .staging-box .staging-list {
+    min-height: 54px;
+    max-height: 112px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    align-items: center;
+    padding: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .staging-box .staging-list .plan-chip {
+    flex-shrink: 0;
+    max-width: 240px;
+  }
+
+  .staging-box .staging-list .chip-desc {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .staging-box .empty-drop-hint {
+    padding: 8px 6px;
+    white-space: nowrap;
+  }
+
+  .staging-box.is-collapsed .staging-header {
+    margin-bottom: 0;
+  }
+
+  .staging-box.is-collapsed .staging-list {
+    display: none;
+  }
+}
