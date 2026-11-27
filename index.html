@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -295,7 +295,7 @@
                 <tr>
                   <th class="col-week">週次</th>
                   <th class="col-period">節次</th>
-                  <th class="col-content">教學內容（將待排事項拖曳至此）</th>
+                  <th class="col-content">學習內容<span class="th-sub">（將待排事項拖曳至此）</span></th>
                 </tr>
               </thead>
               <tbody id="progressTableBody"></tbody>
@@ -467,6 +467,36 @@
     </section>
   </main>
 
+  <!-- ==================== Modal：手機版課務更多操作（⋮） ==================== -->
+  <div id="chipMoreModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3 id="chipMoreTitleDisplay">課務操作</h3>
+        <button type="button" class="modal-close" data-close="chipMoreModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="chipMoreItemId" />
+        <div class="resolve-options">
+          <button type="button" id="chipMoreMoveBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">⇄ 移動至其他節次</span>
+            <span class="resolve-opt-desc">進入點選排課模式，可換到別的節次或退回待排區。</span>
+          </button>
+          <button type="button" id="chipMoreEditBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">✎ 編輯此項目</span>
+            <span class="resolve-opt-desc">修改名稱、性質、標籤顏色、備註或完成狀態。</span>
+          </button>
+          <button type="button" id="chipMoreCopyBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">❐ 複製此項目至待排區</span>
+            <span class="resolve-opt-desc">在待排區建立一筆相同內容的新副本。</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="chipMoreModal">取消</button>
+      </div>
+    </div>
+  </div>
+  
   <!-- ==================== Modals ==================== -->
   <div id="planModal" class="modal-backdrop hidden">
     <div class="modal-card">
@@ -830,5 +860,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=19"></script></body>
+  <script src="script.js?v=20"></script></body>
 </html>

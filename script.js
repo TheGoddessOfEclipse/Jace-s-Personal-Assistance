@@ -2026,6 +2026,25 @@
       if (el) el.classList.remove('is-open');
   }
 
+  on('chipMoreMoveBtn', 'click', () => {
+      const id = document.getElementById('chipMoreItemId').value;
+      closeModal('chipMoreModal');
+      if (!id) return;
+      movingPlanId = id;
+      renderTeaching();
+    });
+
+    on('chipMoreEditBtn', 'click', () => {
+      const id = document.getElementById('chipMoreItemId').value;
+      closeModal('chipMoreModal');
+      if (id) openPlanEditModal(id);
+    });
+
+    on('chipMoreCopyBtn', 'click', () => {
+      const id = document.getElementById('chipMoreItemId').value;
+      closeModal('chipMoreModal');
+      if (id) duplicatePlanItems([id]);
+    });
   on('openMobileConfigBtn', 'click', () => openMobileSheet('mobileConfigSheet'));
   on('openMobileAddPlanBtn', 'click', () => {
     openMobileSheet('mobileAddPlanSheet');
@@ -2311,6 +2330,15 @@
     });
   }
 
+  function openChipMoreModal(itemId) {
+    const cls = getActiveClass();
+    const item = cls.items.find(i => i.id === itemId);
+    if (!item) return;
+    document.getElementById('chipMoreItemId').value = item.id;
+    document.getElementById('chipMoreTitleDisplay').textContent = item.name;
+    openModal('chipMoreModal');
+  }
+
   function createPlanChip(item) {
     const isInTable = item.location && item.location.type === 'cell';
     const isCompleted = isInTable && !!item.completed;
@@ -2331,25 +2359,37 @@
     chip.title = hasDesc ? `備註：${item.desc}\n${baseTip}` : baseTip;
 
     chip.innerHTML = `
-      <div class="chip-main-row">
-        ${isMultiSelectMode ? `<span class="chip-select-box">${isSelected ? '✓' : ''}</span>` : ''}
-        <span class="chip-check">✓</span>
-        <span class="chip-name">${escapeHtml(item.name)}</span>
-        ${item.type ? `<span class="chip-type">${escapeHtml(item.type)}</span>` : ''}
-        ${!isMultiSelectMode ? `
-          <span class="chip-actions">
-            ${isInTable ? '<button type="button" class="chip-action-btn chip-move-btn" data-chip-move title="移動至其他節次">⇄</button>' : ''}
-            <button type="button" class="chip-action-btn" data-chip-edit title="編輯此項目">✎</button>
-            <button type="button" class="chip-action-btn" data-chip-copy title="複製此項目至待排區">❐</button>
-          </span>
-        ` : ''}
+      <div class="chip-content-scroll">
+        <div class="chip-main-row">
+          ${isMultiSelectMode ? `<span class="chip-select-box">${isSelected ? '✓' : ''}</span>` : ''}
+          <span class="chip-check">✓</span>
+          <span class="chip-name">${escapeHtml(item.name)}</span>
+          ${item.type ? `<span class="chip-type">${escapeHtml(item.type)}</span>` : ''}
+          ${!isMultiSelectMode ? `
+            <span class="chip-actions">
+              ${isInTable ? '<button type="button" class="chip-action-btn chip-move-btn" data-chip-move title="移動至其他節次">⇄</button>' : ''}
+              <button type="button" class="chip-action-btn" data-chip-edit title="編輯此項目">✎</button>
+              <button type="button" class="chip-action-btn" data-chip-copy title="複製此項目至待排區">❐</button>
+            </span>
+          ` : ''}
+        </div>
+        ${hasDesc ? `<div class="chip-desc">${escapeHtml(item.desc)}</div>` : ''}
       </div>
-      ${hasDesc ? `<div class="chip-desc">${escapeHtml(item.desc)}</div>` : ''}
+      ${(isInTable && !isMultiSelectMode && !movingPlanId) ? '<button type="button" class="chip-more-btn" data-chip-more title="更多操作" aria-label="更多操作">⋮</button>' : ''}
     `;
 
+    const moreBtn = chip.querySelector('[data-chip-more]');
     const moveBtn = chip.querySelector('[data-chip-move]');
     const editBtn = chip.querySelector('[data-chip-edit]');
     const copyBtn = chip.querySelector('[data-chip-copy]');
+
+    if (moreBtn) {
+      moreBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+      moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openChipMoreModal(item.id);
+      });
+    }
 
     if (moveBtn) {
       moveBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -2423,7 +2463,7 @@
 
     chip.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 && e.pointerType === 'mouse') return;
-      if (e.target.closest('.chip-actions')) return;
+      if (e.target.closest('.chip-actions') || e.target.closest('.chip-more-btn')) return;
 
       const isTouch = e.pointerType !== 'mouse';
       const startX = e.clientX;
@@ -2758,7 +2798,7 @@ for (let w = 1; w <= cls.weeks; w++) {
       if (week1Monday) {
         const wStart = addDays(week1Monday, (w - 1) * 7);
         const wEnd = addDays(wStart, 6);
-        weekRangeHtml = `<span class="week-date-range">${formatShortDate(wStart)}～${formatShortDate(wEnd)}</span>`;
+        weekRangeHtml = `<span class="week-date-range"><span>${formatShortDate(wStart)}～</span><span>${formatShortDate(wEnd)}</span></span>`;
       }
       tdWeek.innerHTML = `第 ${w} 週${weekRangeHtml}`;
       tr.appendChild(tdWeek);

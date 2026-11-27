@@ -2836,3 +2836,158 @@ body.is-touch-dragging {
     white-space: normal;
   }
 }
+
+/* ==================== 課表手機版：欄位縮窄、日期不跑版、⋮ 收納鈕、方塊限兩排捲動（不影響電腦版） ==================== */
+
+/* 電腦版維持原結構，不顯示 ⋮ 按鈕 */
+.chip-content-scroll {
+  display: contents;
+}
+
+.chip-more-btn {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  /* 第三欄標題：主標題一行、括號說明下一行 */
+  .col-content .th-sub {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--ink-muted);
+    margin-top: 2px;
+    line-height: 1.25;
+  }
+
+  /* 課表內課務方塊：三個功能鍵收納進 ⋮，內容限高兩排並可盒內捲動 */
+  .drop-cell .plan-chip,
+  .drop-cell .plan-chip.has-desc {
+    flex-direction: row;
+    align-items: flex-start;
+    width: 100%;
+    padding: 5px 4px 5px 8px;
+    gap: 4px;
+  }
+
+  .drop-cell .plan-chip .chip-actions {
+    display: none;
+  }
+
+  .drop-cell .plan-chip .chip-content-scroll {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    max-height: 44px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding-right: 2px;
+  }
+
+  .drop-cell .plan-chip .chip-main-row {
+    gap: 4px;
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+
+  .drop-cell .plan-chip .chip-type {
+    font-size: 10.5px;
+    padding: 0 5px;
+    line-height: 1.4;
+  }
+
+  .drop-cell .plan-chip .chip-desc {
+    font-size: 11px;
+    line-height: 1.35;
+    padding-top: 2px;
+  }
+
+  .drop-cell .plan-chip .chip-more-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.35);
+    color: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .drop-cell .plan-chip .chip-more-btn:active {
+    background: rgba(255, 255, 255, 0.6);
+  }
+}
+
+@media (max-width: 720px) {
+  /* 縮窄週次與節次欄位，把空間留給學習內容 */
+  .col-week {
+    width: 54px;
+  }
+
+  .col-period {
+    width: 68px;
+  }
+
+  .progress-table th {
+    padding: 8px 4px;
+    font-size: 13px;
+  }
+
+  .week-cell,
+  .period-cell {
+    padding: 6px 3px;
+  }
+
+  .week-cell {
+    font-size: 12.5px;
+  }
+
+  /* 週次日期改上下兩行置中，徹底避免超出欄寬 */
+  .week-date-range {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 10px;
+    line-height: 1.25;
+    margin-top: 3px;
+    white-space: normal;
+  }
+
+  .period-cell {
+    font-size: 11.5px;
+  }
+
+  .period-cell-inner {
+    gap: 2px;
+  }
+
+  .period-date-tag {
+    font-size: 10.5px;
+    letter-spacing: -0.02em;
+  }
+
+  .pin-today-btn {
+    font-size: 10px;
+    padding: 1px 4px;
+    white-space: nowrap;
+  }
+
+  .drop-cell {
+    padding: 6px 5px;
+  }
+
+  .cell-items {
+    gap: 5px;
+  }
+}
