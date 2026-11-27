@@ -1983,6 +1983,23 @@
       });
     }
 
+    const editColorInput = document.getElementById('editPlanColor');
+    document.querySelectorAll('#editPlanColorPresets .swatch').forEach(swatch => {
+      swatch.addEventListener('click', () => {
+        document.querySelectorAll('#editPlanColorPresets .swatch').forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        if (editColorInput) editColorInput.value = swatch.dataset.color;
+      });
+    });
+    if (editColorInput) {
+      editColorInput.addEventListener('input', () => {
+        const picked = editColorInput.value.toLowerCase();
+        document.querySelectorAll('#editPlanColorPresets .swatch').forEach(s => {
+          s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === picked);
+        });
+      });
+    }
+
     on('addPlanItemBtn', 'click', () => {
       const cls = getActiveClass();
       const nameEl = document.getElementById('planName');
@@ -2264,6 +2281,10 @@
     document.getElementById('editPlanName').value = item.name;
     document.getElementById('editPlanType').value = item.type || '';
     document.getElementById('editPlanColor').value = item.color;
+    document.getElementById('editPlanColor').value = item.color;
+    document.querySelectorAll('#editPlanColorPresets .swatch').forEach(s => {
+      s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === (item.color || '').toLowerCase());
+    });
     document.getElementById('editPlanDesc').value = item.desc || '';
 
     const completedCheckbox = document.getElementById('editPlanCompleted');

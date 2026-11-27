@@ -453,9 +453,23 @@
             <input type="text" id="editPlanType" />
           </div>
           <div class="field">
-            <label for="editPlanColor">顏色</label>
-            <input type="color" id="editPlanColor" class="full-color-input" />
+          <label for="editPlanType">性質</label>
+          <input type="text" id="editPlanType" />
+        </div>
+        <div class="field">
+          <label>標籤顏色</label>
+          <div class="color-picker-row">
+            <div id="editPlanColorPresets" class="color-swatches">
+              <button type="button" class="swatch" data-color="#DDE6D5" style="background:#DDE6D5" title="鼠尾草綠"></button>
+              <button type="button" class="swatch" data-color="#F2E2CE" style="background:#F2E2CE" title="燕麥奶茶"></button>
+              <button type="button" class="swatch" data-color="#EFD9D6" style="background:#EFD9D6" title="乾燥玫瑰"></button>
+              <button type="button" class="swatch" data-color="#D8E3EA" style="background:#D8E3EA" title="霧霾藍"></button>
+              <button type="button" class="swatch" data-color="#E4DCEB" style="background:#E4DCEB" title="薰衣草灰"></button>
+              <button type="button" class="swatch" data-color="#EFE7C6" style="background:#EFE7C6" title="淡奶油黃"></button>
+            </div>
+            <input type="color" id="editPlanColor" value="#DDE6D5" title="自訂顏色" />
           </div>
+        </div>
         </div>
         <div class="field">
           <label for="editPlanDesc">詳細備註</label>
@@ -755,5 +769,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=13"></script></body>
+  <script src="script.js?v=14"></script></body>
 </html>
