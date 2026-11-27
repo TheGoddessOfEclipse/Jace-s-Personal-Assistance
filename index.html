@@ -185,6 +185,7 @@
       <div class="mobile-teaching-actions">
         <button type="button" id="openMobileConfigBtn" class="btn-ghost">⚙ 進度表設定</button>
         <button type="button" id="openMobileAddPlanBtn" class="btn-primary">＋ 新增待排事項</button>
+        <button type="button" id="openMobileOverviewBtn" class="btn-ghost" title="全螢幕總覽課表">⛶ 總覽</button>
       </div>
 
       <div id="mobileConfigSheet" class="mobile-sheet-wrap">
@@ -213,6 +214,7 @@
               </label>
               <button type="button" id="generateTableBtn" class="btn-primary">生成／更新表格</button>
               <button type="button" id="toggleMultiSelectBtn" class="btn-ghost">☑ 多選複製</button>
+              <button type="button" id="openFullscreenOverviewBtn" class="btn-ghost">⛶ 全螢幕總覽</button>
             </div>
           </div>
 
@@ -894,6 +896,32 @@
           <button type="button" id="saveSecretarySettingsBtn" class="btn-primary">儲存並重新彙報</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ==================== 全螢幕課表總覽模式 ==================== -->
+  <div id="scheduleOverviewOverlay" class="overview-overlay hidden" role="dialog" aria-modal="true" aria-label="全螢幕課表總覽">
+    <div class="overview-topbar">
+      <div class="overview-topbar-left">
+        <span class="overview-title">課表總覽</span>
+        <select id="overviewClassSelect" class="overview-class-select" aria-label="切換總覽班級"></select>
+        <span id="overviewStatsPill" class="overview-stats-pill"></span>
+      </div>
+      <div class="overview-topbar-right">
+        <label class="overview-toggle-label">
+          <input type="checkbox" id="overviewFitToggle" checked />
+          <span>一頁容納</span>
+        </label>
+        <label class="overview-toggle-label">
+          <input type="checkbox" id="overviewDescToggle" checked />
+          <span>顯示備註</span>
+        </label>
+        <button type="button" id="overviewNativeFsBtn" class="btn-ghost-sm">⛶ 滿版</button>
+        <button type="button" id="closeOverviewBtn" class="btn-primary btn-sm">✕ 關閉</button>
+      </div>
+    </div>
+    <div id="overviewBody" class="overview-body is-fit">
+      <div id="overviewGrid" class="overview-grid"></div>
     </div>
   </div>
 

@@ -42,6 +42,9 @@
   let selectedPlanIds = new Set();
   let movingPlanId = null;
   let isStagingDockCollapsed = false;
+  let overviewFitScreen = true;
+  let overviewShowDesc = true;
+
 
   function isMobileOrTouch() {
     return window.matchMedia('(max-width: 960px), (pointer: coarse)').matches;
@@ -2090,6 +2093,51 @@
   });
 
   function initTeaching() {
+    on('openFullscreenOverviewBtn', 'click', openScheduleOverview);
+    on('openMobileOverviewBtn', 'click', openScheduleOverview);
+    on('closeOverviewBtn', 'click', closeScheduleOverview);
+
+    on('overviewClassSelect', 'change', (e) => {
+      state.teaching.activeClassId = e.target.value;
+      selectedPlanIds.clear();
+      movingPlanId = null;
+      saveState();
+      renderTeaching();
+    });
+
+    on('overviewFitToggle', 'change', (e) => {
+      overviewFitScreen = !!e.target.checked;
+      renderScheduleOverview();
+    });
+
+    on('overviewDescToggle', 'change', (e) => {
+      overviewShowDesc = !!e.target.checked;
+      renderScheduleOverview();
+    });
+
+    const nativeFsBtn = document.getElementById('overviewNativeFsBtn');
+    if (nativeFsBtn) {
+      if (!document.fullscreenEnabled) {
+        nativeFsBtn.classList.add('hidden');
+      } else {
+        nativeFsBtn.addEventListener('click', () => {
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          } else {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        });
+        document.addEventListener('fullscreenchange', () => {
+          nativeFsBtn.textContent = document.fullscreenElement ? '⛶ 退出滿版' : '⛶ 滿版';
+        });
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !isOverviewOpen) return;
+      if (document.querySelector('.modal-backdrop:not(.hidden)')) return;
+      closeScheduleOverview();
+    });
     on('toggleStagingDockBtn', 'click', () => {
       isStagingDockCollapsed = !isStagingDockCollapsed;
       const box = document.querySelector('.staging-box');
@@ -2904,6 +2952,137 @@ for (let w = 1; w <= cls.weeks; w++) {
     tbody.appendChild(tr);
   }
 }
+    if (isOverviewOpen) renderScheduleOverview();
+  }
+
+  function openScheduleOverview() {
+    isOverviewOpen = true;
+    const overlay = document.getElementById('scheduleOverviewOverlay');
+    if (overlay) overlay.classList.remove('hidden');
+    document.body.classList.add('is-overview-open');
+    renderScheduleOverview();
+  }
+
+  function closeScheduleOverview() {
+    isOverviewOpen = false;
+    const overlay = document.getElementById('scheduleOverviewOverlay');
+    if (overlay) overlay.classList.add('hidden');
+    document.body.classList.remove('is-overview-open');
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+
+  function renderScheduleOverview() {
+    const grid = document.getElementById('overviewGrid');
+    const body = document.getElementById('overviewBody');
+    if (!grid || !body) return;
+
+    const cls = getActiveClass();
+    const { todaySlots } = getClassLessonBriefing(cls);
+    const week1Monday = getWeekMonday(cls.startDate);
+    cls.periodWeekdays = normalizePeriodWeekdays(cls.periodWeekdays, cls.periods);
+
+    const classSelect = document.getElementById('overviewClassSelect');
+    if (classSelect) {
+      classSelect.innerHTML = state.teaching.classes
+        .map(c => `<option value="${c.id}"${c.id === cls.id ? ' selected' : ''}>${escapeHtml(c.name)}</option>`)
+        .join('');
+    }
+
+    const scheduledItems = cls.items.filter(i => i.location && i.location.type === 'cell');
+    const completedCount = scheduledItems.filter(i => i.completed).length;
+    const statsPill = document.getElementById('overviewStatsPill');
+    if (statsPill) {
+      statsPill.textContent = `${cls.weeks} 週 × ${cls.periods} 堂｜已排 ${scheduledItems.length} 項（完成 ${completedCount}）`;
+    }
+
+    const fitCheckbox = document.getElementById('overviewFitToggle');
+    if (fitCheckbox) fitCheckbox.checked = overviewFitScreen;
+    const descCheckbox = document.getElementById('overviewDescToggle');
+    if (descCheckbox) descCheckbox.checked = overviewShowDesc;
+
+    body.classList.toggle('is-fit', overviewFitScreen);
+    body.classList.toggle('hide-desc', !overviewShowDesc);
+
+    grid.style.setProperty('--ov-weeks', cls.weeks);
+    grid.style.setProperty('--ov-periods', cls.periods);
+    grid.innerHTML = '';
+
+    // 左上角表頭
+    const corner = document.createElement('div');
+    corner.className = 'ov-corner';
+    corner.textContent = '週 \\ 節';
+    grid.appendChild(corner);
+
+    // 各節次欄表頭
+    for (let p = 1; p <= cls.periods; p++) {
+      const wd = cls.periodWeekdays[p - 1] || 0;
+      const colHead = document.createElement('div');
+      colHead.className = 'ov-col-head';
+      colHead.innerHTML = `<span>第 ${p} 節</span>${wd ? `<span class="ov-col-wd">(${WEEKDAY_NAMES[wd]})</span>` : ''}`;
+      grid.appendChild(colHead);
+    }
+
+    // 逐週渲染矩陣格子
+    for (let w = 1; w <= cls.weeks; w++) {
+      const weekHead = document.createElement('div');
+      weekHead.className = 'ov-week-head';
+      let rangeHtml = '';
+      if (week1Monday) {
+        const wStart = addDays(week1Monday, (w - 1) * 7);
+        const wEnd = addDays(wStart, 6);
+        rangeHtml = `<span class="ov-week-range">${formatShortDate(wStart)}～${formatShortDate(wEnd)}</span>`;
+      }
+      weekHead.innerHTML = `<span>第 ${w} 週</span>${rangeHtml}`;
+      grid.appendChild(weekHead);
+
+      for (let p = 1; p <= cls.periods; p++) {
+        const slotInfo = getSlotDateInfo(cls, w, p);
+        const isToday = todaySlots.some(s => s.week === w && s.period === p);
+        const cellItems = cls.items.filter(
+          i => i.location && i.location.type === 'cell' && i.location.week === w && i.location.period === p
+        );
+
+        const cell = document.createElement('div');
+        cell.className = `ov-cell${isToday ? ' is-today' : ''}`;
+
+        if (slotInfo.shortDate || isToday) {
+          const head = document.createElement('div');
+          head.className = 'ov-cell-head';
+          head.innerHTML = `
+            <span class="ov-cell-date">${slotInfo.shortDate ? `${slotInfo.shortDate}${slotInfo.weekdayShort ? `(${slotInfo.weekdayShort})` : ''}` : ''}</span>
+            ${isToday ? '<span class="ov-today-tag">今日</span>' : ''}
+          `;
+          cell.appendChild(head);
+        }
+
+        const itemsWrap = document.createElement('div');
+        itemsWrap.className = 'ov-items';
+
+        cellItems.forEach(item => {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = `ov-chip${item.completed ? ' is-completed' : ''}`;
+          chip.style.backgroundColor = item.color;
+          chip.style.color = getContrastColor(item.color);
+          chip.title = `${item.name}${item.type ? `（${item.type}）` : ''}${item.desc ? `\n備註：${item.desc}` : ''}\n點擊檢視或編輯`;
+          chip.innerHTML = `
+            <div class="ov-chip-top">
+              ${item.completed ? '<span>✓</span>' : ''}
+              <span class="ov-chip-name">${escapeHtml(item.name)}</span>
+              ${item.type ? `<span class="ov-chip-type">${escapeHtml(item.type)}</span>` : ''}
+            </div>
+            ${item.desc ? `<div class="ov-chip-desc">${escapeHtml(item.desc)}</div>` : ''}
+          `;
+          chip.addEventListener('click', () => openPlanEditModal(item.id));
+          itemsWrap.appendChild(chip);
+        });
+
+        cell.appendChild(itemsWrap);
+        grid.appendChild(cell);
+      }
+    }
   }
 
   // ==================== 第二部分：待辦事項平台 ====================
