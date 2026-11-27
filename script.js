@@ -2079,28 +2079,34 @@
     const isInTable = item.location && item.location.type === 'cell';
     const isCompleted = isInTable && !!item.completed;
     const isSelected = selectedPlanIds.has(item.id);
+    const hasDesc = !!(item.desc && item.desc.trim());
     const chip = document.createElement('div');
-    chip.className = `plan-chip${isCompleted ? ' completed' : ''}${isMultiSelectMode ? ' multi-selectable' : ''}${isSelected ? ' is-selected' : ''}`;
+    chip.className = `plan-chip${isCompleted ? ' completed' : ''}${isMultiSelectMode ? ' multi-selectable' : ''}${isSelected ? ' is-selected' : ''}${hasDesc ? ' has-desc' : ''}`;
     chip.dataset.itemId = item.id;
     chip.style.backgroundColor = item.color;
     chip.style.color = getContrastColor(item.color);
-    chip.title = isMultiSelectMode
+
+    const baseTip = isMultiSelectMode
       ? '點擊選取或取消選取此項目'
       : isInTable
         ? '拖曳或長按可移位｜點一下標記完成｜點右側圖示編輯或複製'
         : '拖曳或長按排入進度表｜點右側圖示編輯或複製';
+    chip.title = hasDesc ? `備註：${item.desc}\n${baseTip}` : baseTip;
 
     chip.innerHTML = `
-      ${isMultiSelectMode ? `<span class="chip-select-box">${isSelected ? '✓' : ''}</span>` : ''}
-      <span class="chip-check">✓</span>
-      <span class="chip-name">${escapeHtml(item.name)}</span>
-      ${item.type ? `<span class="chip-type">${escapeHtml(item.type)}</span>` : ''}
-      ${!isMultiSelectMode ? `
-        <span class="chip-actions">
-          <button type="button" class="chip-action-btn" data-chip-edit title="編輯此項目">✎</button>
-          <button type="button" class="chip-action-btn" data-chip-copy title="複製此項目至待排區">❐</button>
-        </span>
-      ` : ''}
+      <div class="chip-main-row">
+        ${isMultiSelectMode ? `<span class="chip-select-box">${isSelected ? '✓' : ''}</span>` : ''}
+        <span class="chip-check">✓</span>
+        <span class="chip-name">${escapeHtml(item.name)}</span>
+        ${item.type ? `<span class="chip-type">${escapeHtml(item.type)}</span>` : ''}
+        ${!isMultiSelectMode ? `
+          <span class="chip-actions">
+            <button type="button" class="chip-action-btn" data-chip-edit title="編輯此項目">✎</button>
+            <button type="button" class="chip-action-btn" data-chip-copy title="複製此項目至待排區">❐</button>
+          </span>
+        ` : ''}
+      </div>
+      ${hasDesc ? `<div class="chip-desc">${escapeHtml(item.desc)}</div>` : ''}
     `;
 
     const editBtn = chip.querySelector('[data-chip-edit]');
