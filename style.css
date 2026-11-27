@@ -2313,3 +2313,96 @@ input[type="color"] {
   margin-bottom: 6px;
   font-weight: 500;
 }
+
+/* ==================== 教學進度平台：第一週日期與各節星期設定 ==================== */
+.panel-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.toolbar-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.inline-field input[type="date"] {
+  width: 146px;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.period-weekday-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.period-weekday-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.weekday-slot-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+}
+
+.weekday-slot-item select {
+  width: auto;
+  min-width: 72px;
+  padding: 3px 6px;
+  font-size: 12.5px;
+  background: #FFFFFF;
+}
+
+.col-week {
+  width: 104px;
+}
+
+.col-period {
+  width: 132px;
+}
+
+.week-date-range {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.period-date-tag {
+  font-size: 11.5px;
+  color: var(--accent);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .col-week {
+    width: 78px;
+  }
+
+  .col-period {
+    width: 98px;
+  }
+}

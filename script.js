@@ -72,12 +72,14 @@
   }
 
   // ==================== 初始預設資料 ====================
-  function createDefaultClass(name = '英文 A 班', weeks = 6, periods = 4) {
+  function createDefaultClass(name = '英文 A 班', weeks = 6, periods = 4, startDate = '') {
     return {
       id: uid('cls'),
       name,
       weeks,
       periods,
+      startDate,
+      periodWeekdays: Array(periods).fill(0),
       pinnedSlot: null,
       items: []
     };
@@ -144,6 +146,53 @@
     const a = new Date(`${dateStrA}T00:00:00`);
     const b = new Date(`${dateStrB}T00:00:00`);
     return Math.round((b - a) / (1000 * 60 * 60 * 24));
+  }
+
+  const WEEKDAY_NAMES = ['', '週一', '週二', '週三', '週四', '週五', '週六', '週日'];
+  const WEEKDAY_SHORT = ['', '一', '二', '三', '四', '五', '六', '日'];
+
+  function normalizePeriodWeekdays(raw, periods) {
+    const arr = [];
+    for (let i = 0; i < periods; i++) {
+      let val = 0;
+      if (Array.isArray(raw)) {
+        val = parseInt(raw[i], 10) || 0;
+      } else if (raw && typeof raw === 'object') {
+        val = parseInt(raw[i] ?? raw[String(i)], 10) || 0;
+      }
+      arr.push(val >= 1 && val <= 7 ? val : 0);
+    }
+    return arr;
+  }
+
+  function getWeekMonday(dateStr) {
+    if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const day = new Date(y, m - 1, d).getDay(); // 0=日, 1=一 ... 6=六
+    const isoDay = day === 0 ? 7 : day;
+    return addDays(dateStr, -(isoDay - 1));
+  }
+
+  function formatShortDate(dateStr) {
+    if (!dateStr) return '';
+    const [, m, d] = dateStr.split('-');
+    return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
+  }
+
+  function getSlotDateInfo(cls, week, period) {
+    const wd = (cls.periodWeekdays && cls.periodWeekdays[period - 1]) || 0;
+    const week1Monday = getWeekMonday(cls.startDate);
+    let date = null;
+    if (week1Monday && wd >= 1 && wd <= 7) {
+      date = addDays(week1Monday, (week - 1) * 7 + (wd - 1));
+    }
+    return {
+      weekday: wd,
+      weekdayName: WEEKDAY_NAMES[wd] || '',
+      weekdayShort: WEEKDAY_SHORT[wd] || '',
+      date,
+      shortDate: date ? formatShortDate(date) : ''
+    };
   }
 
   function escapeHtml(str = '') {
@@ -250,23 +299,29 @@
     let teaching;
     const rawClasses = parsed.teaching ? toArray(parsed.teaching.classes) : [];
     if (rawClasses.length > 0) {
-      const normalizedClasses = rawClasses.map(c => ({
-        id: c.id || uid('cls'),
-        name: c.name || '未命名班級',
-        weeks: Math.max(1, parseInt(c.weeks, 10) || 6),
-        periods: Math.max(1, parseInt(c.periods, 10) || 4),
-        pinnedSlot: c.pinnedSlot || null,
-        items: toArray(c.items).map(item => ({
-          id: item.id || uid('plan'),
-          name: item.name || '',
-          type: item.type || '',
-          color: item.color || '#DDE6D5',
-          desc: item.desc || '',
-          completed: !!item.completed,
-          completedAt: item.completedAt || null,
-          location: item.location || { type: 'staging' }
-        }))
-      }));
+      const normalizedClasses = rawClasses.map(c => {
+        const weeks = Math.max(1, parseInt(c.weeks, 10) || 6);
+        const periods = Math.max(1, parseInt(c.periods, 10) || 4);
+        return {
+          id: c.id || uid('cls'),
+          name: c.name || '未命名班級',
+          weeks,
+          periods,
+          startDate: c.startDate || '',
+          periodWeekdays: normalizePeriodWeekdays(c.periodWeekdays, periods),
+          pinnedSlot: c.pinnedSlot || null,
+          items: toArray(c.items).map(item => ({
+            id: item.id || uid('plan'),
+            name: item.name || '',
+            type: item.type || '',
+            color: item.color || '#DDE6D5',
+            desc: item.desc || '',
+            completed: !!item.completed,
+            completedAt: item.completedAt || null,
+            location: item.location || { type: 'staging' }
+          }))
+        };
+      });
       const activeId = normalizedClasses.some(c => c.id === parsed.teaching.activeClassId)
         ? parsed.teaching.activeClassId
         : normalizedClasses[0].id;
@@ -630,36 +685,73 @@
         const items = cls.items.filter(
           i => i.location.type === 'cell' && i.location.week === w && i.location.period === p
         );
-        slots.push({ week: w, period: p, items });
+        const info = getSlotDateInfo(cls, w, p);
+        slots.push({
+          week: w,
+          period: p,
+          items,
+          date: info.date,
+          shortDate: info.shortDate,
+          weekday: info.weekday,
+          weekdayName: info.weekdayName,
+          weekdayShort: info.weekdayShort
+        });
       }
     }
 
-    let todayIndex = -1;
-    let isPinned = false;
+    const hasScheduleDates = !!getWeekMonday(cls.startDate) && slots.some(s => !!s.date);
 
+    // 1. 若有手動釘選今日進度，優先採用
     if (cls.pinnedSlot && cls.pinnedSlot.date === today) {
       const idx = slots.findIndex(
         s => s.week === cls.pinnedSlot.week && s.period === cls.pinnedSlot.period
       );
       if (idx !== -1) {
-        todayIndex = idx;
-        isPinned = true;
+        const pinned = slots[idx];
+        let nextSlots = [];
+        if (hasScheduleDates && pinned.date) {
+          const futureWithItems = slots
+            .filter(s => s.date && (s.date > pinned.date || (s.date === pinned.date && s.period > pinned.period)) && s.items.length > 0)
+            .sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period);
+          if (futureWithItems.length > 0) {
+            const nextDate = futureWithItems[0].date;
+            nextSlots = futureWithItems.filter(s => s.date === nextDate);
+          }
+        } else {
+          const next = slots.slice(idx + 1).find(s => s.items.length > 0);
+          if (next) nextSlots = [next];
+        }
+        return { todaySlots: [pinned], nextSlots, isPinned: true, isDateMode: hasScheduleDates };
       }
     }
 
-    if (todayIndex === -1) {
-      todayIndex = slots.findIndex(s =>
-        s.items.some(item => !item.completed || item.completedAt === today)
-      );
+    // 2. 已設定第一週日期與星期：依實際日期精準推算
+    if (hasScheduleDates) {
+      const todaySlots = slots.filter(s => s.date === today);
+      const futureWithItems = slots
+        .filter(s => s.date && s.date > today && s.items.length > 0)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.period - b.period);
+
+      let nextSlots = [];
+      if (futureWithItems.length > 0) {
+        const nextDate = futureWithItems[0].date;
+        nextSlots = futureWithItems.filter(s => s.date === nextDate);
+      }
+      return { todaySlots, nextSlots, isPinned: false, isDateMode: true };
     }
 
-    const todaySlot = todayIndex !== -1 ? slots[todayIndex] : null;
-    let nextSlot = null;
+    // 3. 尚未設定日期與星期：維持原本依未完成進度自動偵測
+    const todayIndex = slots.findIndex(s =>
+      s.items.some(item => !item.completed || item.completedAt === today)
+    );
+    const todaySlots = todayIndex !== -1 ? [slots[todayIndex]] : [];
+    let nextSlots = [];
     if (todayIndex !== -1) {
-      nextSlot = slots.slice(todayIndex + 1).find(s => s.items.length > 0) || null;
+      const next = slots.slice(todayIndex + 1).find(s => s.items.length > 0);
+      if (next) nextSlots = [next];
     }
 
-    return { todaySlot, nextSlot, isPinned };
+    return { todaySlots, nextSlots, isPinned: false, isDateMode: false };
   }
 
   // ==================== 首頁：RPG 個人秘書、頭像裁切、AI 簡報、整合條列與歷史 ====================
@@ -837,8 +929,9 @@
         return;
       }
       document.getElementById('secNameInput').value = state.secretary.name || '傑森的線上秘書';
-      document.getElementById('secApiKeyInput').value = state.secretary.apiKey || '';
-      document.getElementById('secApiKeyInput').type = 'password';
+      const apiKeyInput = document.getElementById('secApiKeyInput');
+      apiKeyInput.value = state.secretary.apiKey || '';
+      apiKeyInput.classList.add('api-key-masked');
       document.getElementById('toggleApiKeyVisBtn').textContent = '顯示';
       document.getElementById('secModelSelect').value = state.secretary.model || 'gemini-2.5-flash';
       document.getElementById('secPersonaInput').value = state.secretary.persona || DEFAULT_SECRETARY_PERSONA;
@@ -850,9 +943,8 @@
 
     on('toggleApiKeyVisBtn', 'click', (e) => {
       const input = document.getElementById('secApiKeyInput');
-      const isPwd = input.type === 'password';
-      input.type = isPwd ? 'text' : 'password';
-      e.target.textContent = isPwd ? '隱藏' : '顯示';
+      const isMasked = input.classList.toggle('api-key-masked');
+      e.target.textContent = isMasked ? '顯示' : '隱藏';
     });
 
     on('secResetPersonaBtn', 'click', () => {
@@ -1440,9 +1532,11 @@
 
     // 1. 教學進度（各班今日進度 + 下堂課進度）
     state.teaching.classes.forEach(cls => {
-      const { todaySlot, nextSlot } = getClassLessonBriefing(cls);
+      const { todaySlots, nextSlots } = getClassLessonBriefing(cls);
 
-      if (todaySlot && todaySlot.items.length > 0) {
+      todaySlots.forEach(todaySlot => {
+        if (!todaySlot || todaySlot.items.length === 0) return;
+        const dateSuffix = todaySlot.shortDate ? `・${todaySlot.shortDate}(${todaySlot.weekdayShort})` : '';
         todaySlot.items.forEach(item => {
           if (!item.completed) teachingPending++;
           rowCount++;
@@ -1455,7 +1549,7 @@
                 <div class="unified-main-line">
                   <span class="origin-tag origin-teaching">來自 教學進度平台</span>
                   <span class="origin-slash">/</span>
-                  <span class="unified-sub-pill">${escapeHtml(cls.name)}・今日進度（W${todaySlot.week}-第${todaySlot.period}節）</span>
+                  <span class="unified-sub-pill">${escapeHtml(cls.name)}・今日進度（W${todaySlot.week}-第${todaySlot.period}節${dateSuffix}）</span>
                   <span class="unified-content-title">
                     <span class="color-dot" style="background:${item.color}"></span>
                     ${escapeHtml(item.name)}${item.type ? `（${escapeHtml(item.type)}）` : ''}
@@ -1477,9 +1571,11 @@
 
           listEl.appendChild(li);
         });
-      }
+      });
 
-      if (nextSlot && nextSlot.items.length > 0) {
+      nextSlots.forEach(nextSlot => {
+        if (!nextSlot || nextSlot.items.length === 0) return;
+        const dateSuffix = nextSlot.shortDate ? `・${nextSlot.shortDate}(${nextSlot.weekdayShort})` : '';
         nextSlot.items.forEach(item => {
           rowCount++;
           const li = document.createElement('li');
@@ -1491,7 +1587,7 @@
                 <div class="unified-main-line">
                   <span class="origin-tag origin-teaching">來自 教學進度平台</span>
                   <span class="origin-slash">/</span>
-                  <span class="unified-sub-pill">${escapeHtml(cls.name)}・下堂課進度（W${nextSlot.week}-第${nextSlot.period}節）</span>
+                  <span class="unified-sub-pill">${escapeHtml(cls.name)}・下堂課進度（W${nextSlot.week}-第${nextSlot.period}節${dateSuffix}）</span>
                   <span class="unified-content-title">
                     <span class="color-dot" style="background:${item.color}"></span>
                     ${escapeHtml(item.name)}${item.type ? `（${escapeHtml(item.type)}）` : ''}
@@ -1513,7 +1609,7 @@
 
           listEl.appendChild(li);
         });
-      }
+      });
     });
 
     // 2. 七日內或已到提醒日的活動（排除暫停提醒尚未到期者）
@@ -1645,21 +1741,25 @@
     // 組裝三大平台摘要供 AI 秘書檢視
     const teachingSummary = [];
     state.teaching.classes.forEach(cls => {
-      const { todaySlot, nextSlot } = getClassLessonBriefing(cls);
-      if (todaySlot && todaySlot.items.length > 0) {
+      const { todaySlots, nextSlots } = getClassLessonBriefing(cls);
+      todaySlots.forEach(todaySlot => {
+        if (!todaySlot || todaySlot.items.length === 0) return;
+        const dateText = todaySlot.date ? ` ${todaySlot.date}(${todaySlot.weekdayName})` : '';
         todaySlot.items.forEach(item => {
           teachingSummary.push(
-            `[今日・${cls.name} W${todaySlot.week}-第${todaySlot.period}節] ${item.completed ? '(已完成)' : '(待教)'} ${item.name}${item.type ? `(${item.type})` : ''}${item.desc ? ` - 備註:${item.desc}` : ''}`
+            `[今日・${cls.name} W${todaySlot.week}-第${todaySlot.period}節${dateText}] ${item.completed ? '(已完成)' : '(待教)'} ${item.name}${item.type ? `(${item.type})` : ''}${item.desc ? ` - 備註:${item.desc}` : ''}`
           );
         });
-      }
-      if (nextSlot && nextSlot.items.length > 0) {
+      });
+      nextSlots.forEach(nextSlot => {
+        if (!nextSlot || nextSlot.items.length === 0) return;
+        const dateText = nextSlot.date ? ` ${nextSlot.date}(${nextSlot.weekdayName})` : '';
         nextSlot.items.forEach(item => {
           teachingSummary.push(
-            `[下堂課・${cls.name} W${nextSlot.week}-第${nextSlot.period}節] ${item.name}${item.type ? `(${item.type})` : ''}`
+            `[下堂課・${cls.name} W${nextSlot.week}-第${nextSlot.period}節${dateText}] ${item.name}${item.type ? `(${item.type})` : ''}`
           );
         });
-      }
+      });
     });
 
     const eventSummary = upcoming7Days.map(evt => {
@@ -1788,7 +1888,7 @@
 
       if (mode === 'add') {
         const current = getActiveClass();
-        const newCls = createDefaultClass(name, current.weeks, current.periods);
+        const newCls = createDefaultClass(name, current.weeks, current.periods, current.startDate || '');
         state.teaching.classes.push(newCls);
         state.teaching.activeClassId = newCls.id;
         selectedPlanIds.clear();
@@ -1820,16 +1920,33 @@
       showToast(`已刪除班級「${cls.name}」`);
     });
 
+    on('week1StartDateInput', 'change', (e) => {
+      const cls = getActiveClass();
+      cls.startDate = e.target.value || '';
+      saveState();
+      renderTeaching();
+      renderBriefing();
+      const mon = getWeekMonday(cls.startDate);
+      showToast(
+        mon
+          ? `已設定「${cls.name}」第一週（週一起始：${mon}）`
+          : `已清除「${cls.name}」第一週日期設定`
+      );
+    });
+
     on('generateTableBtn', 'click', () => {
       const cls = getActiveClass();
       const weeksInput = document.getElementById('weeksInput');
       const periodsInput = document.getElementById('periodsInput');
+      const startDateInput = document.getElementById('week1StartDateInput');
       const w = Math.max(1, Math.min(40, parseInt(weeksInput.value, 10) || 1));
       const p = Math.max(1, Math.min(15, parseInt(periodsInput.value, 10) || 1));
       weeksInput.value = w;
       periodsInput.value = p;
       cls.weeks = w;
       cls.periods = p;
+      cls.startDate = startDateInput ? (startDateInput.value || '') : (cls.startDate || '');
+      cls.periodWeekdays = normalizePeriodWeekdays(cls.periodWeekdays, p);
 
       let returnedCount = 0;
       cls.items.forEach(item => {
@@ -1852,7 +1969,6 @@
           : `已更新「${cls.name}」為 ${w} 週 × 每週 ${p} 堂`
       );
     });
-
     const colorInput = document.getElementById('planColor');
     document.querySelectorAll('#planColorPresets .swatch').forEach(swatch => {
       swatch.addEventListener('click', () => {
@@ -1903,8 +2019,9 @@
       const newName = document.getElementById('editPlanName').value.trim();
       if (!newName) return showToast('名稱不可為空');
 
+      const isInTable = item.location && item.location.type === 'cell';
       const wasCompleted = item.completed;
-      const nowCompleted = document.getElementById('editPlanCompleted').checked;
+      const nowCompleted = isInTable && document.getElementById('editPlanCompleted').checked;
       item.name = newName;
       item.type = document.getElementById('editPlanType').value.trim();
       item.color = document.getElementById('editPlanColor').value;
@@ -1942,15 +2059,19 @@
   }
 
   function createPlanChip(item) {
+    const isInTable = item.location && item.location.type === 'cell';
+    const isCompleted = isInTable && !!item.completed;
     const isSelected = selectedPlanIds.has(item.id);
     const chip = document.createElement('div');
-    chip.className = `plan-chip${item.completed ? ' completed' : ''}${isMultiSelectMode ? ' multi-selectable' : ''}${isSelected ? ' is-selected' : ''}`;
+    chip.className = `plan-chip${isCompleted ? ' completed' : ''}${isMultiSelectMode ? ' multi-selectable' : ''}${isSelected ? ' is-selected' : ''}`;
     chip.dataset.itemId = item.id;
     chip.style.backgroundColor = item.color;
     chip.style.color = getContrastColor(item.color);
     chip.title = isMultiSelectMode
       ? '點擊選取或取消選取此項目'
-      : '拖曳或長按可移位｜點一下標記完成｜點右側圖示編輯或複製';
+      : isInTable
+        ? '拖曳或長按可移位｜點一下標記完成｜點右側圖示編輯或複製'
+        : '拖曳或長按排入進度表｜點右側圖示編輯或複製';
 
     chip.innerHTML = `
       ${isMultiSelectMode ? `<span class="chip-select-box">${isSelected ? '✓' : ''}</span>` : ''}
@@ -2073,6 +2194,8 @@
             if (item) {
               if (dropType === 'staging') {
                 item.location = { type: 'staging' };
+                item.completed = false;
+                item.completedAt = null;
               } else if (dropType === 'cell') {
                 item.location = {
                   type: 'cell',
@@ -2124,7 +2247,7 @@
   function togglePlanCompleted(itemId) {
     const cls = getActiveClass();
     const item = cls.items.find(i => i.id === itemId);
-    if (!item) return;
+    if (!item || !item.location || item.location.type !== 'cell') return;
     item.completed = !item.completed;
     item.completedAt = item.completed ? getTodayStr() : null;
     saveState();
@@ -2136,19 +2259,25 @@
     const cls = getActiveClass();
     const item = cls.items.find(i => i.id === itemId);
     if (!item) return;
+    const isInTable = item.location && item.location.type === 'cell';
     document.getElementById('editPlanId').value = item.id;
     document.getElementById('editPlanName').value = item.name;
     document.getElementById('editPlanType').value = item.type || '';
     document.getElementById('editPlanColor').value = item.color;
     document.getElementById('editPlanDesc').value = item.desc || '';
-    document.getElementById('editPlanCompleted').checked = !!item.completed;
+
+    const completedCheckbox = document.getElementById('editPlanCompleted');
+    completedCheckbox.checked = isInTable && !!item.completed;
+    const completedField = completedCheckbox.closest('.checkbox-field');
+    if (completedField) completedField.classList.toggle('hidden', !isInTable);
+
     openModal('planModal');
   }
 
   function renderTeaching() {
     const cls = getActiveClass();
     const today = getTodayStr();
-    const { todaySlot, isPinned } = getClassLessonBriefing(cls);
+    const { todaySlots, isPinned } = getClassLessonBriefing(cls);
 
     const validIds = new Set(cls.items.map(i => i.id));
     Array.from(selectedPlanIds).forEach(id => {
@@ -2192,6 +2321,39 @@
     document.getElementById('activeClassHeading').textContent = `${cls.name}｜進度表設定`;
     document.getElementById('weeksInput').value = cls.weeks;
     document.getElementById('periodsInput').value = cls.periods;
+    const startDateEl = document.getElementById('week1StartDateInput');
+if (startDateEl) startDateEl.value = cls.startDate || '';
+
+const weekdayBar = document.getElementById('periodWeekdayBar');
+if (weekdayBar) {
+  cls.periodWeekdays = normalizePeriodWeekdays(cls.periodWeekdays, cls.periods);
+  weekdayBar.innerHTML = '<span class="period-weekday-label">每週各堂星期：</span>';
+  for (let p = 1; p <= cls.periods; p++) {
+    const currentWd = cls.periodWeekdays[p - 1] || 0;
+    const wrap = document.createElement('label');
+    wrap.className = 'weekday-slot-item';
+    wrap.innerHTML = `
+      <span>第 ${p} 節</span>
+      <select data-period-wd="${p}">
+        <option value="0"${currentWd === 0 ? ' selected' : ''}>未指定</option>
+        <option value="1"${currentWd === 1 ? ' selected' : ''}>週一</option>
+        <option value="2"${currentWd === 2 ? ' selected' : ''}>週二</option>
+        <option value="3"${currentWd === 3 ? ' selected' : ''}>週三</option>
+        <option value="4"${currentWd === 4 ? ' selected' : ''}>週四</option>
+        <option value="5"${currentWd === 5 ? ' selected' : ''}>週五</option>
+        <option value="6"${currentWd === 6 ? ' selected' : ''}>週六</option>
+        <option value="7"${currentWd === 7 ? ' selected' : ''}>週日</option>
+      </select>
+    `;
+    wrap.querySelector('select').addEventListener('change', (e) => {
+      cls.periodWeekdays[p - 1] = parseInt(e.target.value, 10) || 0;
+      saveState();
+      renderTeaching();
+      renderBriefing();
+    });
+    weekdayBar.appendChild(wrap);
+  }
+}
 
     const stagingList = document.getElementById('stagingList');
     stagingList.innerHTML = '';
@@ -2207,64 +2369,81 @@
     const tbody = document.getElementById('progressTableBody');
     tbody.innerHTML = '';
 
-    for (let w = 1; w <= cls.weeks; w++) {
-      for (let p = 1; p <= cls.periods; p++) {
-        const tr = document.createElement('tr');
-        const isCurrentTodayRow = todaySlot && todaySlot.week === w && todaySlot.period === p;
+    const week1Monday = getWeekMonday(cls.startDate);
 
-        if (p === 1) {
-          const tdWeek = document.createElement('td');
-          tdWeek.className = 'week-cell';
-          tdWeek.rowSpan = cls.periods;
-          tdWeek.textContent = `第 ${w} 週`;
-          tr.appendChild(tdWeek);
-        }
+for (let w = 1; w <= cls.weeks; w++) {
+  for (let p = 1; p <= cls.periods; p++) {
+    const tr = document.createElement('tr');
+    const isCurrentTodayRow = todaySlots.some(s => s.week === w && s.period === p);
+    const slotInfo = getSlotDateInfo(cls, w, p);
 
-        const tdPeriod = document.createElement('td');
-        tdPeriod.className = 'period-cell';
-        const pinLabel = isCurrentTodayRow ? (isPinned ? '★ 今日進度' : '● 今日進度') : '設為今日';
-        const pinClass = isCurrentTodayRow ? (isPinned ? 'is-pinned' : 'is-auto-today') : '';
-
-        tdPeriod.innerHTML = `
-          <div class="period-cell-inner">
-            <span>第 ${p} 節</span>
-            <button type="button" class="pin-today-btn ${pinClass}" title="指定此節為首頁 Today's Briefing 的今日進度">${pinLabel}</button>
-          </div>
-        `;
-
-        tdPeriod.querySelector('.pin-today-btn').addEventListener('click', () => {
-          if (isPinned && isCurrentTodayRow) {
-            cls.pinnedSlot = null;
-            showToast('已取消手動釘選，改回自動偵測今日進度');
-          } else {
-            cls.pinnedSlot = { week: w, period: p, date: today };
-            showToast(`已將「${cls.name}」第 ${w} 週第 ${p} 節設為今日進度`);
-          }
-          saveState();
-          renderTeaching();
-          renderBriefing();
-        });
-
-        tr.appendChild(tdPeriod);
-
-        const tdContent = document.createElement('td');
-        tdContent.className = `drop-cell drop-zone${isCurrentTodayRow ? ' today-highlight' : ''}`;
-        tdContent.dataset.dropType = 'cell';
-        tdContent.dataset.week = w;
-        tdContent.dataset.period = p;
-
-        const itemsWrap = document.createElement('div');
-        itemsWrap.className = 'cell-items';
-        const cellItems = cls.items.filter(
-          i => i.location.type === 'cell' && i.location.week === w && i.location.period === p
-        );
-        cellItems.forEach(item => itemsWrap.appendChild(createPlanChip(item)));
-
-        tdContent.appendChild(itemsWrap);
-        tr.appendChild(tdContent);
-        tbody.appendChild(tr);
+    if (p === 1) {
+      const tdWeek = document.createElement('td');
+      tdWeek.className = 'week-cell';
+      tdWeek.rowSpan = cls.periods;
+      let weekRangeHtml = '';
+      if (week1Monday) {
+        const wStart = addDays(week1Monday, (w - 1) * 7);
+        const wEnd = addDays(wStart, 6);
+        weekRangeHtml = `<span class="week-date-range">${formatShortDate(wStart)}～${formatShortDate(wEnd)}</span>`;
       }
+      tdWeek.innerHTML = `第 ${w} 週${weekRangeHtml}`;
+      tr.appendChild(tdWeek);
     }
+
+    const tdPeriod = document.createElement('td');
+    tdPeriod.className = 'period-cell';
+    const pinLabel = isCurrentTodayRow ? (isPinned ? '★ 今日進度' : '● 今日進度') : '設為今日';
+    const pinClass = isCurrentTodayRow ? (isPinned ? 'is-pinned' : 'is-auto-today') : '';
+
+    let periodDateHtml = '';
+    if (slotInfo.date) {
+      periodDateHtml = `<span class="period-date-tag">${slotInfo.shortDate} (${slotInfo.weekdayShort})</span>`;
+    } else if (slotInfo.weekdayName) {
+      periodDateHtml = `<span class="period-date-tag">(${slotInfo.weekdayName})</span>`;
+    }
+
+    tdPeriod.innerHTML = `
+      <div class="period-cell-inner">
+        <span>第 ${p} 節</span>
+        ${periodDateHtml}
+        <button type="button" class="pin-today-btn ${pinClass}" title="指定此節為首頁 Today's Briefing 的今日進度">${pinLabel}</button>
+      </div>
+    `;
+
+    tdPeriod.querySelector('.pin-today-btn').addEventListener('click', () => {
+      if (isPinned && isCurrentTodayRow) {
+        cls.pinnedSlot = null;
+        showToast('已取消手動釘選，改回自動偵測今日進度');
+      } else {
+        cls.pinnedSlot = { week: w, period: p, date: today };
+        showToast(`已將「${cls.name}」第 ${w} 週第 ${p} 節設為今日進度`);
+      }
+      saveState();
+      renderTeaching();
+      renderBriefing();
+    });
+
+    tr.appendChild(tdPeriod);
+
+    const tdContent = document.createElement('td');
+    tdContent.className = `drop-cell drop-zone${isCurrentTodayRow ? ' today-highlight' : ''}`;
+    tdContent.dataset.dropType = 'cell';
+    tdContent.dataset.week = w;
+    tdContent.dataset.period = p;
+
+    const itemsWrap = document.createElement('div');
+    itemsWrap.className = 'cell-items';
+    const cellItems = cls.items.filter(
+      i => i.location.type === 'cell' && i.location.week === w && i.location.period === p
+    );
+    cellItems.forEach(item => itemsWrap.appendChild(createPlanChip(item)));
+
+    tdContent.appendChild(itemsWrap);
+    tr.appendChild(tdContent);
+    tbody.appendChild(tr);
+  }
+}
   }
 
   // ==================== 第二部分：待辦事項平台 ====================

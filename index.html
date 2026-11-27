@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -164,22 +164,30 @@
       </div>
 
       <div class="panel-toolbar card">
-        <div class="toolbar-title">
-          <h2 id="activeClassHeading">進度表設定</h2>
-          <p class="hint">操作提示：拖曳或長按移位｜點一下標記完成｜點項目上的 ✎ 編輯、❐ 複製｜開啟「多選複製」可批次複製多個項目</p>
+        <div class="toolbar-top-row">
+          <div class="toolbar-title">
+            <h2 id="activeClassHeading">進度表設定</h2>
+            <p class="hint">操作提示：拖曳或長按移位｜點一下標記完成｜點項目上的 ✎ 編輯、❐ 複製｜設定第一週日期與星期後將自動依日期推算今日進度</p>
+          </div>
+          <div class="grid-config-form">
+            <label class="inline-field">
+              <span>總週數</span>
+              <input type="number" id="weeksInput" min="1" max="40" value="6" />
+            </label>
+            <label class="inline-field">
+              <span>每週堂數</span>
+              <input type="number" id="periodsInput" min="1" max="15" value="4" />
+            </label>
+            <label class="inline-field">
+              <span>第一週日期</span>
+              <input type="date" id="week1StartDateInput" title="選擇第一週的任一天，系統會自動對齊該週週一" />
+            </label>
+            <button type="button" id="generateTableBtn" class="btn-primary">生成／更新表格</button>
+            <button type="button" id="toggleMultiSelectBtn" class="btn-ghost">☑ 多選複製</button>
+          </div>
         </div>
-        <div class="grid-config-form">
-          <label class="inline-field">
-            <span>總週數</span>
-            <input type="number" id="weeksInput" min="1" max="40" value="6" />
-          </label>
-          <label class="inline-field">
-            <span>每週堂數</span>
-            <input type="number" id="periodsInput" min="1" max="15" value="4" />
-          </label>
-          <button type="button" id="generateTableBtn" class="btn-primary">生成／更新表格</button>
-          <button type="button" id="toggleMultiSelectBtn" class="btn-ghost">☑ 多選複製</button>
-        </div>
+
+        <div id="periodWeekdayBar" class="period-weekday-bar"></div>
       </div>
 
       <!-- 多選批次複製工具列 -->
@@ -715,7 +723,7 @@
         <div class="field">
           <label for="secApiKeyInput">Gemini API Key（僅存於你的專屬 Firebase，不會出現在程式碼中）</label>
           <div class="api-key-row">
-            <input type="password" id="secApiKeyInput" placeholder="貼上 AIza 開頭的免費 API Key" autocomplete="off" />
+            <input type="text" id="secApiKeyInput" class="api-key-masked" placeholder="貼上 AIza 開頭的免費 API Key" autocomplete="off" spellcheck="false" />
             <button type="button" id="toggleApiKeyVisBtn" class="btn-ghost-sm">顯示</button>
           </div>
           <span class="hint">留空時會自動使用內建統計台詞。</span>
@@ -747,6 +755,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=10"></script>
-</body>
+  <script src="script.js?v=13"></script></body>
 </html>
