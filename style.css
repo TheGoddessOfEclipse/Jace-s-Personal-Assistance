@@ -3205,3 +3205,7 @@ body.is-touch-dragging {
     margin-top: 4px;
   }
 }
+
+.api-key-masked {
+  -webkit-text-security: disc;
+}

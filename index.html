@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=9" />
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -163,7 +163,7 @@
         <!-- 電腦版原本的班級切換列（手機版隱藏） -->
         <div class="class-bar-left">
           <span class="class-bar-label">班級切換</span>
-          <div id="classTabsList" class="class-tabs-list"></div>
+          <div id="classTabsContainer" class="class-tabs"></div>
         </div>
 
         <!-- 電腦版維持一排；手機版自動拆成第 2 列（班級切換▾ + 新增班級）與第 3 列（重新命名 + 刪除班級） -->
@@ -526,14 +526,23 @@
           <label for="editPlanName">事項名稱</label>
           <input type="text" id="editPlanName" />
         </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="editPlanType">性質</label>
-            <input type="text" id="editPlanType" />
-          </div>
-          <div class="field">
+        <div class="field">
           <label for="editPlanType">性質</label>
           <input type="text" id="editPlanType" />
+        </div>
+        <div class="field">
+          <label>標籤顏色</label>
+          <div class="color-picker-row">
+            <div id="editPlanColorPresets" class="color-swatches">
+              <button type="button" class="swatch" data-color="#DDE6D5" style="background:#DDE6D5" title="鼠尾草綠"></button>
+              <button type="button" class="swatch" data-color="#F2E2CE" style="background:#F2E2CE" title="燕麥奶茶"></button>
+              <button type="button" class="swatch" data-color="#EFD9D6" style="background:#EFD9D6" title="乾燥玫瑰"></button>
+              <button type="button" class="swatch" data-color="#D8E3EA" style="background:#D8E3EA" title="霧霾藍"></button>
+              <button type="button" class="swatch" data-color="#E4DCEB" style="background:#E4DCEB" title="薰衣草灰"></button>
+              <button type="button" class="swatch" data-color="#EFE7C6" style="background:#EFE7C6" title="淡奶油黃"></button>
+            </div>
+            <input type="color" id="editPlanColor" value="#DDE6D5" title="自訂顏色" />
+          </div>
         </div>
         <div class="field">
           <label>標籤顏色</label>
