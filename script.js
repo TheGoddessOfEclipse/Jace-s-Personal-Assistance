@@ -345,11 +345,14 @@
       teaching = base.teaching;
     }
 
+    const rawModel = (parsed.secretary && parsed.secretary.model) || 'gemini-2.5-flash';
+    const normalizedModel = rawModel === 'gemini-2.5-flash-lite' ? 'gemini-3.5-flash-lite' : rawModel;
+
     const secretary = {
       name: (parsed.secretary && parsed.secretary.name) || base.secretary.name,
       avatar: (parsed.secretary && parsed.secretary.avatar) || '',
       apiKey: (parsed.secretary && parsed.secretary.apiKey) || '',
-      model: (parsed.secretary && parsed.secretary.model) || 'gemini-2.5-flash',
+      model: normalizedModel,
       persona: (parsed.secretary && parsed.secretary.persona) || DEFAULT_SECRETARY_PERSONA,
       lastBriefingText: (parsed.secretary && parsed.secretary.lastBriefingText) || '',
       lastBriefingHash: (parsed.secretary && parsed.secretary.lastBriefingHash) || ''
