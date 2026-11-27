@@ -2026,6 +2026,24 @@
       if (el) el.classList.remove('is-open');
   }
 
+  on('mobileClassDropdownBtn', 'click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById('mobileClassDropdownMenu');
+      const btn = document.getElementById('mobileClassDropdownBtn');
+      if (!menu || !btn) return;
+      const isHidden = menu.classList.toggle('hidden');
+      btn.setAttribute('aria-expanded', String(!isHidden));
+    });
+
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('.mobile-class-dropdown-wrap')) return;
+      const menu = document.getElementById('mobileClassDropdownMenu');
+      const btn = document.getElementById('mobileClassDropdownBtn');
+      if (menu && !menu.classList.contains('hidden')) {
+        menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+    });
   on('chipMoreMoveBtn', 'click', () => {
       const id = document.getElementById('chipMoreItemId').value;
       closeModal('chipMoreModal');
@@ -2727,6 +2745,30 @@
 
     document.getElementById('activeClassHeading').textContent = `${cls.name}｜進度表設定`;
     document.getElementById('weeksInput').value = cls.weeks;
+    const mobileCurrentNameEl = document.getElementById('mobileCurrentClassName');
+    if (mobileCurrentNameEl) mobileCurrentNameEl.textContent = cls.name;
+
+    const mobileDropdownMenu = document.getElementById('mobileClassDropdownMenu');
+    if (mobileDropdownMenu) {
+      mobileDropdownMenu.innerHTML = '';
+      state.teaching.classes.forEach(c => {
+        const opt = document.createElement('button');
+        opt.type = 'button';
+        opt.className = `mobile-class-option${c.id === cls.id ? ' active' : ''}`;
+        opt.innerHTML = `<span>${escapeHtml(c.name)}</span>${c.id === cls.id ? '<span>✓</span>' : ''}`;
+        opt.addEventListener('click', () => {
+          state.teaching.activeClassId = c.id;
+          selectedPlanIds.clear();
+          movingPlanId = null;
+          mobileDropdownMenu.classList.add('hidden');
+          const ddBtn = document.getElementById('mobileClassDropdownBtn');
+          if (ddBtn) ddBtn.setAttribute('aria-expanded', 'false');
+          saveState();
+          renderTeaching();
+        });
+        mobileDropdownMenu.appendChild(opt);
+      });
+    }
     document.getElementById('periodsInput').value = cls.periods;
     const startDateEl = document.getElementById('week1StartDateInput');
 if (startDateEl) startDateEl.value = cls.startDate || '';

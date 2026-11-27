@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -154,14 +154,30 @@
     <!-- ==================== 第一部分：教學進度平台 ==================== -->
     <section id="tab-teaching" class="tab-panel">
       <div class="class-bar card">
+        <!-- 手機版第 1 列：目前課表班級（電腦版隱藏） -->
+        <div class="mobile-current-class-row">
+          <span class="mobile-class-label">目前課表班級</span>
+          <strong id="mobileCurrentClassName" class="mobile-current-class-badge"></strong>
+        </div>
+
+        <!-- 電腦版原本的班級切換列（手機版隱藏） -->
         <div class="class-bar-left">
           <span class="class-bar-label">班級切換</span>
-          <div id="classTabsContainer" class="class-tabs"></div>
+          <div id="classTabsList" class="class-tabs-list"></div>
         </div>
+
+        <!-- 電腦版維持一排；手機版自動拆成第 2 列（班級切換▾ + 新增班級）與第 3 列（重新命名 + 刪除班級） -->
         <div class="class-bar-actions">
-          <button type="button" id="addClassBtn" class="btn-primary btn-sm">＋ 新增班級</button>
-          <button type="button" id="renameClassBtn" class="btn-ghost-sm">重新命名</button>
-          <button type="button" id="deleteClassBtn" class="btn-ghost-sm danger-outline">刪除班級</button>
+          <div class="mobile-class-dropdown-wrap">
+            <button type="button" id="mobileClassDropdownBtn" class="btn-ghost mobile-class-switch-btn" aria-expanded="false">
+              <span>班級切換</span>
+              <span class="dropdown-caret">▾</span>
+            </button>
+            <div id="mobileClassDropdownMenu" class="mobile-class-dropdown-menu hidden"></div>
+          </div>
+          <button type="button" id="addClassBtn" class="btn-primary">＋ 新增班級</button>
+          <button type="button" id="renameClassBtn" class="btn-ghost">重新命名</button>
+          <button type="button" id="deleteClassBtn" class="btn-ghost">刪除班級</button>
         </div>
       </div>
 
@@ -860,5 +876,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=20"></script></body>
+  <script src="script.js?v=21"></script></body>
 </html>
