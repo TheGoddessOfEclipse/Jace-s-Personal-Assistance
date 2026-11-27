@@ -12,7 +12,7 @@
     appId: "1:222352360644:web:693d06971123e5afbcf591"
   };
 
-  // 請填入允許登入此線上秘書的 Gmail
+  // 允許登入此線上秘書的 Gmail 白名單
   const ALLOWED_EMAILS = [
     "jwls0202@gmail.com"
   ];
@@ -28,7 +28,6 @@
   let saveTimer = null;
   const CLIENT_ID = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   let localSyncSeq = 0;
-
 
   // UI 與 AI 狀態
   let currentBriefingView = 'today'; // 'today' | 'history'
@@ -46,16 +45,15 @@
   let overviewFitScreen = true;
   let overviewShowDesc = true;
 
+  let isGeneratingAiBriefing = false;
+  let hasAutoRefreshedOnLoad = false;
+  let latestBriefingPayload = null;
+  let aiAutoTimer = null;
+  let clickTracker = { id: null, timer: null };
 
   function isMobileOrTouch() {
     return window.matchMedia('(max-width: 960px), (pointer: coarse)').matches;
   }
-
-  let isGeneratingAiBriefing = false;
-  let hasAutoRefreshedOnLoad = false;
-  let lastFailedBriefingHash = '';
-  let latestBriefingPayload = null;
-  let aiAutoTimer = null;
 
   function on(id, eventName, handler) {
     const el = document.getElementById(id);
@@ -249,6 +247,7 @@
       desc: item.desc || '',
       completed: false,
       completedAt: null,
+      dismissedDate: null,
       location: { type: 'staging' }
     });
     saveState();
@@ -345,7 +344,10 @@
       );
       migratedClass.items = toArray(parsed.teaching.items).map(item => ({
         ...item,
-        completedAt: item.completedAt || null
+        completed: !!item.completed,
+        completedAt: item.completedAt || null,
+        dismissedDate: item.dismissedDate || null,
+        location: item.location || { type: 'staging' }
       }));
       teaching = {
         activeClassId: migratedClass.id,
@@ -593,8 +595,9 @@
         userEmailDisplay.title = user.email;
       }
 
-      renderAll();
+      // 先啟動雲端同步監聽，再渲染畫面，避免局部 UI 錯誤阻斷雲端載入
       startCloudSync();
+      renderAll();
     });
   }
 
@@ -764,7 +767,7 @@
       return { todaySlots, nextSlots, isPinned: false, isDateMode: true };
     }
 
-    // 3. 尚未設定日期與星期：維持原本依未完成進度自動偵測
+    // 3. 尚未設定日期與星期：依未完成進度自動偵測
     const todayIndex = slots.findIndex(s =>
       s.items.some(item => !item.completed || item.completedAt === today)
     );
@@ -875,7 +878,6 @@
               resetCropView();
               openModal('avatarCropModal');
             } else {
-              // 若 index.html 尚未加入裁切視窗，自動置中裁切
               const c = document.createElement('canvas');
               c.width = 304;
               c.height = 372;
@@ -987,7 +989,6 @@
       state.secretary.model = model;
       state.secretary.persona = persona;
       state.secretary.lastBriefingHash = '';
-      lastFailedBriefingHash = '';
 
       saveState();
       closeModal('secretarySettingsModal');
@@ -1009,7 +1010,6 @@
         return;
       }
       if (latestBriefingPayload) {
-        lastFailedBriefingHash = '';
         generateAiBriefing(latestBriefingPayload, true);
       }
     });
@@ -1022,7 +1022,7 @@
       showToast('已移除秘書圖像');
     });
 
-// ---------- 教學進度處理詢問視窗 ----------
+    // ---------- 教學進度處理詢問視窗 ----------
     on('resolvePlanSeenBtn', 'click', () => {
       const clsId = document.getElementById('resolvePlanClassId').value;
       const itemId = document.getElementById('resolvePlanItemId').value;
@@ -1162,7 +1162,7 @@
     document.getElementById('resolvePlanTitleDisplay').textContent = `${cls.name}｜${item.name}`;
     openModal('planResolveModal');
   }
-  
+
   function openTodoResolveModal(todo) {
     document.getElementById('resolveTodoId').value = todo.id;
     document.getElementById('resolveTodoTitleDisplay').textContent = todo.title;
@@ -1171,10 +1171,7 @@
 
   function openEventResolveModal(evt) {
     const modal = document.getElementById('eventResolveModal');
-    if (!modal) {
-      alert('找不到活動提醒設定視窗（eventResolveModal），請確認 index.html 已貼上 Modal 7。');
-      return;
-    }
+    if (!modal) return;
 
     const today = getTodayStr();
     const tomorrow = addDays(today, 1);
@@ -1264,9 +1261,7 @@
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     try {
-      const generationConfig = {
-        temperature: 0.75
-      };
+      const generationConfig = { temperature: 0.75 };
       if (model.includes('2.5')) {
         generationConfig.thinkingConfig = { thinkingBudget: 0 };
       }
@@ -1281,11 +1276,6 @@
       });
 
       const data = await res.json();
-      console.log('AI 回傳狀態:', {
-        model,
-        finishReason: data?.candidates?.[0]?.finishReason,
-        usage: data?.usageMetadata
-      });
       if (!res.ok) {
         throw new Error(data?.error?.message || `HTTP ${res.status}`);
       }
@@ -1301,7 +1291,6 @@
 
       state.secretary.lastBriefingText = aiText;
       state.secretary.lastBriefingHash = payload.hash;
-      lastFailedBriefingHash = '';
       saveState();
 
       if (dialogueEl) {
@@ -1312,7 +1301,6 @@
       if (isManual) showToast('AI 秘書已完成最新彙報');
     } catch (err) {
       console.error('Gemini API 呼叫失敗:', err);
-      lastFailedBriefingHash = payload.hash;
       if (dialogueEl) {
         dialogueEl.classList.remove('is-loading');
         dialogueEl.textContent = state.secretary.lastBriefingText || buildFallbackDialogue(payload);
@@ -1357,7 +1345,7 @@
     if (!payload) return;
     latestBriefingPayload = payload;
 
-    const { teachingPending, eventsCount, todosCount, hash } = payload;
+    const { teachingPending, eventsCount, todosCount } = payload;
     const dialogueEl = document.getElementById('rpgDialogueText');
 
     document.getElementById('rpgSummaryPills').innerHTML = `
@@ -1589,11 +1577,9 @@
 
     let teachingPending = 0;
     let rowCount = 0;
-
-    // 1. 教學進度（各班今日進度 + 下堂課進度）
-    // 1. 教學進度（各班今日進度 + 下堂課進度）
     let hiddenDismissedPlansCount = 0;
 
+    // 1. 教學進度（各班今日進度 + 下堂課進度）
     state.teaching.classes.forEach(cls => {
       const { todaySlots, nextSlots } = getClassLessonBriefing(cls);
 
@@ -1897,7 +1883,7 @@
     renderBriefingHistory();
   }
 
-  // ==================== 第一部分：教學進度平台（多班級、編輯、複製、多選批次複製） ====================
+  // ==================== 第一部分：教學進度平台 ====================
   function setMultiSelectMode(enabled) {
     isMultiSelectMode = enabled;
     if (enabled) movingPlanId = null;
@@ -1920,6 +1906,7 @@
       item.location = { type: 'staging' };
       item.completed = false;
       item.completedAt = null;
+      item.dismissedDate = null;
     } else if (location.type === 'cell') {
       item.location = {
         type: 'cell',
@@ -2005,6 +1992,7 @@
         desc: item.desc || '',
         completed: false,
         completedAt: null,
+        dismissedDate: null,
         location: { type: 'staging' }
       });
     });
@@ -2021,16 +2009,18 @@
   }
 
   function openMobileSheet(id) {
-      const el = document.getElementById(id);
-      if (el) el.classList.add('is-open');
+    const el = document.getElementById(id);
+    if (el) el.classList.add('is-open');
   }
 
   function closeMobileSheet(id) {
-      const el = document.getElementById(id);
-      if (el) el.classList.remove('is-open');
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('is-open');
   }
 
-  on('mobileClassDropdownBtn', 'click', (e) => {
+  function initTeaching() {
+    // 行動端班級切換下拉選單
+    on('mobileClassDropdownBtn', 'click', (e) => {
       e.stopPropagation();
       const menu = document.getElementById('mobileClassDropdownMenu');
       const btn = document.getElementById('mobileClassDropdownBtn');
@@ -2048,7 +2038,9 @@
         if (btn) btn.setAttribute('aria-expanded', 'false');
       }
     });
-  on('chipMoreMoveBtn', 'click', () => {
+
+    // 行動端課務 ⋮ 更多操作視窗
+    on('chipMoreMoveBtn', 'click', () => {
       const id = document.getElementById('chipMoreItemId').value;
       closeModal('chipMoreModal');
       if (!id) return;
@@ -2067,33 +2059,35 @@
       closeModal('chipMoreModal');
       if (id) duplicatePlanItems([id]);
     });
-  on('openMobileConfigBtn', 'click', () => openMobileSheet('mobileConfigSheet'));
-  on('openMobileAddPlanBtn', 'click', () => {
-    openMobileSheet('mobileAddPlanSheet');
-    setTimeout(() => {
-      const el = document.getElementById('planName');
-      if (el) el.focus();
-    }, 60);
-  });
 
-  document.querySelectorAll('[data-close-sheet]').forEach(btn => {
-    btn.addEventListener('click', () => closeMobileSheet(btn.dataset.closeSheet));
-  });
-
-  document.querySelectorAll('.mobile-sheet-wrap').forEach(sheet => {
-    let startedOnBackdrop = false;
-    sheet.addEventListener('pointerdown', (e) => {
-      startedOnBackdrop = (e.target === sheet);
+    // 行動端彈窗（進度表設定、新增待排事項）
+    on('openMobileConfigBtn', 'click', () => openMobileSheet('mobileConfigSheet'));
+    on('openMobileAddPlanBtn', 'click', () => {
+      openMobileSheet('mobileAddPlanSheet');
+      setTimeout(() => {
+        const el = document.getElementById('planName');
+        if (el) el.focus();
+      }, 60);
     });
-    sheet.addEventListener('click', (e) => {
-      if (startedOnBackdrop && e.target === sheet) {
-        sheet.classList.remove('is-open');
-      }
-      startedOnBackdrop = false;
-    });
-  });
 
-  function initTeaching() {
+    document.querySelectorAll('[data-close-sheet]').forEach(btn => {
+      btn.addEventListener('click', () => closeMobileSheet(btn.dataset.closeSheet));
+    });
+
+    document.querySelectorAll('.mobile-sheet-wrap').forEach(sheet => {
+      let startedOnBackdrop = false;
+      sheet.addEventListener('pointerdown', (e) => {
+        startedOnBackdrop = (e.target === sheet);
+      });
+      sheet.addEventListener('click', (e) => {
+        if (startedOnBackdrop && e.target === sheet) {
+          sheet.classList.remove('is-open');
+        }
+        startedOnBackdrop = false;
+      });
+    });
+
+    // 全螢幕課表總覽模式
     on('openFullscreenOverviewBtn', 'click', openScheduleOverview);
     on('openMobileOverviewBtn', 'click', openScheduleOverview);
     on('closeOverviewBtn', 'click', closeScheduleOverview);
@@ -2139,6 +2133,8 @@
       if (document.querySelector('.modal-backdrop:not(.hidden)')) return;
       closeScheduleOverview();
     });
+
+    // 待排區收合與點選退回
     on('toggleStagingDockBtn', 'click', () => {
       isStagingDockCollapsed = !isStagingDockCollapsed;
       const box = document.querySelector('.staging-box');
@@ -2156,9 +2152,11 @@
         movePlanItemToLocation(movingPlanId, { type: 'staging' });
       }
     });
+
+    // 多選複製
     on('toggleMultiSelectBtn', 'click', () => {
-    closeMobileSheet('mobileConfigSheet');
-    setMultiSelectMode(!isMultiSelectMode);
+      closeMobileSheet('mobileConfigSheet');
+      setMultiSelectMode(!isMultiSelectMode);
     });
     on('stagingMultiBtn', 'click', () => setMultiSelectMode(!isMultiSelectMode));
     on('exitMultiSelectBtn', 'click', () => setMultiSelectMode(false));
@@ -2185,6 +2183,7 @@
       renderTeaching();
     });
 
+    // 班級管理
     on('addClassBtn', 'click', () => {
       document.getElementById('classModalMode').value = 'add';
       document.getElementById('classModalTitle').textContent = '新增班級';
@@ -2213,6 +2212,7 @@
         state.teaching.classes.push(newCls);
         state.teaching.activeClassId = newCls.id;
         selectedPlanIds.clear();
+        movingPlanId = null;
         showToast(`已新增班級「${name}」`);
       } else {
         const cls = getActiveClass();
@@ -2235,15 +2235,18 @@
       state.teaching.classes = state.teaching.classes.filter(c => c.id !== cls.id);
       state.teaching.activeClassId = state.teaching.classes[0].id;
       selectedPlanIds.clear();
+      movingPlanId = null;
       saveState();
       renderTeaching();
       renderBriefing();
       showToast(`已刪除班級「${cls.name}」`);
     });
 
+    // 第一週日期與表格尺寸更新
     on('week1StartDateInput', 'change', (e) => {
       const cls = getActiveClass();
       cls.startDate = e.target.value || '';
+      cls.pinnedSlot = null;
       saveState();
       renderTeaching();
       renderBriefing();
@@ -2273,6 +2276,9 @@
       cls.items.forEach(item => {
         if (item.location.type === 'cell' && (item.location.week > w || item.location.period > p)) {
           item.location = { type: 'staging' };
+          item.completed = false;
+          item.completedAt = null;
+          item.dismissedDate = null;
           returnedCount++;
         }
       });
@@ -2291,12 +2297,14 @@
       );
       closeMobileSheet('mobileConfigSheet');
     });
+
+    // 標籤顏色色票（新增＋編輯）
     const colorInput = document.getElementById('planColor');
     document.querySelectorAll('#planColorPresets .swatch').forEach(swatch => {
       swatch.addEventListener('click', () => {
         document.querySelectorAll('#planColorPresets .swatch').forEach(s => s.classList.remove('active'));
         swatch.classList.add('active');
-        colorInput.value = swatch.dataset.color;
+        if (colorInput) colorInput.value = swatch.dataset.color;
       });
     });
     if (colorInput) {
@@ -2322,6 +2330,7 @@
       });
     }
 
+    // 新增與編輯待排事項
     on('addPlanItemBtn', 'click', () => {
       const cls = getActiveClass();
       const nameEl = document.getElementById('planName');
@@ -2336,10 +2345,11 @@
         id: uid('plan'),
         name,
         type: typeEl.value.trim(),
-        color: colorInput.value,
+        color: colorInput ? colorInput.value : '#DDE6D5',
         desc: descEl.value.trim(),
         completed: false,
         completedAt: null,
+        dismissedDate: null,
         location: { type: 'staging' }
       });
       nameEl.value = '';
@@ -2487,8 +2497,6 @@
     return chip;
   }
 
-  let clickTracker = { id: null, timer: null };
-
   function attachChipInteractions(chip, itemId) {
     if (isMultiSelectMode) {
       chip.addEventListener('click', (e) => {
@@ -2551,7 +2559,7 @@
         if (!isDragging) return;
         let scrolled = false;
 
-        // 優先支援手機固定課表視窗內部上下捲動
+        // 優先支援固定課表視窗內部上下捲動
         const tableWrap = document.querySelector('#tab-teaching .table-wrapper');
         if (tableWrap && tableWrap.scrollHeight > tableWrap.clientHeight) {
           const rect = tableWrap.getBoundingClientRect();
@@ -2734,7 +2742,6 @@
     document.getElementById('editPlanName').value = item.name;
     document.getElementById('editPlanType').value = item.type || '';
     document.getElementById('editPlanColor').value = item.color;
-    document.getElementById('editPlanColor').value = item.color;
     document.querySelectorAll('#editPlanColorPresets .swatch').forEach(s => {
       s.classList.toggle('active', (s.dataset.color || '').toLowerCase() === (item.color || '').toLowerCase());
     });
@@ -2776,24 +2783,27 @@
       .join('');
     targetSelect.value = state.teaching.classes.some(c => c.id === prevTarget) ? prevTarget : cls.id;
 
+    // 電腦版班級切換列
     const tabsWrap = document.getElementById('classTabsContainer');
-    tabsWrap.innerHTML = '';
-    state.teaching.classes.forEach(c => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `class-tab-btn${c.id === cls.id ? ' active' : ''}`;
-      btn.textContent = c.name;
-      btn.addEventListener('click', () => {
-        state.teaching.activeClassId = c.id;
-        movingPlanId = null;
-        saveState();
-        renderTeaching();
+    if (tabsWrap) {
+      tabsWrap.innerHTML = '';
+      state.teaching.classes.forEach(c => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `class-tab-btn${c.id === cls.id ? ' active' : ''}`;
+        btn.textContent = c.name;
+        btn.addEventListener('click', () => {
+          state.teaching.activeClassId = c.id;
+          selectedPlanIds.clear();
+          movingPlanId = null;
+          saveState();
+          renderTeaching();
+        });
+        tabsWrap.appendChild(btn);
       });
-      tabsWrap.appendChild(btn);
-    });
+    }
 
-    document.getElementById('activeClassHeading').textContent = `${cls.name}｜進度表設定`;
-    document.getElementById('weeksInput').value = cls.weeks;
+    // 行動端目前班級與下拉清單
     const mobileCurrentNameEl = document.getElementById('mobileCurrentClassName');
     if (mobileCurrentNameEl) mobileCurrentNameEl.textContent = cls.name;
 
@@ -2818,40 +2828,44 @@
         mobileDropdownMenu.appendChild(opt);
       });
     }
+
+    document.getElementById('activeClassHeading').textContent = `${cls.name}｜進度表設定`;
+    document.getElementById('weeksInput').value = cls.weeks;
     document.getElementById('periodsInput').value = cls.periods;
     const startDateEl = document.getElementById('week1StartDateInput');
-if (startDateEl) startDateEl.value = cls.startDate || '';
+    if (startDateEl) startDateEl.value = cls.startDate || '';
 
-const weekdayBar = document.getElementById('periodWeekdayBar');
-if (weekdayBar) {
-  cls.periodWeekdays = normalizePeriodWeekdays(cls.periodWeekdays, cls.periods);
-  weekdayBar.innerHTML = '<span class="period-weekday-label">每週各堂星期：</span>';
-  for (let p = 1; p <= cls.periods; p++) {
-    const currentWd = cls.periodWeekdays[p - 1] || 0;
-    const wrap = document.createElement('label');
-    wrap.className = 'weekday-slot-item';
-    wrap.innerHTML = `
-      <span>第 ${p} 節</span>
-      <select data-period-wd="${p}">
-        <option value="0"${currentWd === 0 ? ' selected' : ''}>未指定</option>
-        <option value="1"${currentWd === 1 ? ' selected' : ''}>週一</option>
-        <option value="2"${currentWd === 2 ? ' selected' : ''}>週二</option>
-        <option value="3"${currentWd === 3 ? ' selected' : ''}>週三</option>
-        <option value="4"${currentWd === 4 ? ' selected' : ''}>週四</option>
-        <option value="5"${currentWd === 5 ? ' selected' : ''}>週五</option>
-        <option value="6"${currentWd === 6 ? ' selected' : ''}>週六</option>
-        <option value="7"${currentWd === 7 ? ' selected' : ''}>週日</option>
-      </select>
-    `;
-    wrap.querySelector('select').addEventListener('change', (e) => {
-      cls.periodWeekdays[p - 1] = parseInt(e.target.value, 10) || 0;
-      saveState();
-      renderTeaching();
-      renderBriefing();
-    });
-    weekdayBar.appendChild(wrap);
-  }
-}
+    const weekdayBar = document.getElementById('periodWeekdayBar');
+    if (weekdayBar) {
+      cls.periodWeekdays = normalizePeriodWeekdays(cls.periodWeekdays, cls.periods);
+      weekdayBar.innerHTML = '<span class="period-weekday-label">每週各堂星期：</span>';
+      for (let p = 1; p <= cls.periods; p++) {
+        const currentWd = cls.periodWeekdays[p - 1] || 0;
+        const wrap = document.createElement('label');
+        wrap.className = 'weekday-slot-item';
+        wrap.innerHTML = `
+          <span>第 ${p} 節</span>
+          <select data-period-wd="${p}">
+            <option value="0"${currentWd === 0 ? ' selected' : ''}>未指定</option>
+            <option value="1"${currentWd === 1 ? ' selected' : ''}>週一</option>
+            <option value="2"${currentWd === 2 ? ' selected' : ''}>週二</option>
+            <option value="3"${currentWd === 3 ? ' selected' : ''}>週三</option>
+            <option value="4"${currentWd === 4 ? ' selected' : ''}>週四</option>
+            <option value="5"${currentWd === 5 ? ' selected' : ''}>週五</option>
+            <option value="6"${currentWd === 6 ? ' selected' : ''}>週六</option>
+            <option value="7"${currentWd === 7 ? ' selected' : ''}>週日</option>
+          </select>
+        `;
+        wrap.querySelector('select').addEventListener('change', (e) => {
+          cls.periodWeekdays[p - 1] = parseInt(e.target.value, 10) || 0;
+          cls.pinnedSlot = null;
+          saveState();
+          renderTeaching();
+          renderBriefing();
+        });
+        weekdayBar.appendChild(wrap);
+      }
+    }
 
     const stagingList = document.getElementById('stagingList');
     stagingList.innerHTML = '';
@@ -2864,6 +2878,7 @@ if (weekdayBar) {
     const movingItem = movingPlanId ? cls.items.find(i => i.id === movingPlanId) : null;
     stagingList.classList.toggle('is-place-target', !!(movingItem && movingItem.location && movingItem.location.type === 'cell'));
     renderMobileMoveBanner(cls);
+
     if (stagingItems.length === 0) {
       stagingList.innerHTML = '<div class="empty-drop-hint">尚無待排事項，可於上方新增或由表格拖回此處</div>';
     } else {
@@ -2872,90 +2887,93 @@ if (weekdayBar) {
 
     const tbody = document.getElementById('progressTableBody');
     tbody.innerHTML = '';
-
     const week1Monday = getWeekMonday(cls.startDate);
 
-for (let w = 1; w <= cls.weeks; w++) {
-  for (let p = 1; p <= cls.periods; p++) {
-    const tr = document.createElement('tr');
-    const isCurrentTodayRow = todaySlots.some(s => s.week === w && s.period === p);
-    const slotInfo = getSlotDateInfo(cls, w, p);
+    for (let w = 1; w <= cls.weeks; w++) {
+      for (let p = 1; p <= cls.periods; p++) {
+        const tr = document.createElement('tr');
+        const isCurrentTodayRow = todaySlots.some(s => s.week === w && s.period === p);
+        const slotInfo = getSlotDateInfo(cls, w, p);
 
-    if (p === 1) {
-      const tdWeek = document.createElement('td');
-      tdWeek.className = 'week-cell';
-      tdWeek.rowSpan = cls.periods;
-      let weekRangeHtml = '';
-      if (week1Monday) {
-        const wStart = addDays(week1Monday, (w - 1) * 7);
-        const wEnd = addDays(wStart, 6);
-        weekRangeHtml = `<span class="week-date-range"><span>${formatShortDate(wStart)}～</span><span>${formatShortDate(wEnd)}</span></span>`;
+        if (p === 1) {
+          const tdWeek = document.createElement('td');
+          tdWeek.className = 'week-cell';
+          tdWeek.rowSpan = cls.periods;
+          let weekRangeHtml = '';
+          if (week1Monday) {
+            const wStart = addDays(week1Monday, (w - 1) * 7);
+            const wEnd = addDays(wStart, 6);
+            weekRangeHtml = `<span class="week-date-range"><span>${formatShortDate(wStart)}～</span><span>${formatShortDate(wEnd)}</span></span>`;
+          }
+          tdWeek.innerHTML = `第 ${w} 週${weekRangeHtml}`;
+          tr.appendChild(tdWeek);
+        }
+
+        const tdPeriod = document.createElement('td');
+        tdPeriod.className = 'period-cell';
+        const pinLabel = isCurrentTodayRow ? (isPinned ? '★ 今日進度' : '● 今日進度') : '設為今日';
+        const pinClass = isCurrentTodayRow ? (isPinned ? 'is-pinned' : 'is-auto-today') : '';
+
+        let periodDateHtml = '';
+        if (slotInfo.date) {
+          periodDateHtml = `<span class="period-date-tag">${slotInfo.shortDate} (${slotInfo.weekdayShort})</span>`;
+        } else if (slotInfo.weekdayName) {
+          periodDateHtml = `<span class="period-date-tag">(${slotInfo.weekdayName})</span>`;
+        }
+
+        tdPeriod.innerHTML = `
+          <div class="period-cell-inner">
+            <span>第 ${p} 節</span>
+            ${periodDateHtml}
+            <button type="button" class="pin-today-btn ${pinClass}" title="指定此節為首頁 Today's Briefing 的今日進度">${pinLabel}</button>
+          </div>
+        `;
+
+        tdPeriod.querySelector('.pin-today-btn').addEventListener('click', () => {
+          if (isPinned && isCurrentTodayRow) {
+            cls.pinnedSlot = null;
+            showToast('已取消手動釘選，改回自動偵測今日進度');
+          } else {
+            cls.pinnedSlot = { week: w, period: p, date: today };
+            showToast(`已將「${cls.name}」第 ${w} 週第 ${p} 節設為今日進度`);
+          }
+          saveState();
+          renderTeaching();
+          renderBriefing();
+        });
+
+        tr.appendChild(tdPeriod);
+
+        const tdContent = document.createElement('td');
+        tdContent.className = `drop-cell drop-zone${isCurrentTodayRow ? ' today-highlight' : ''}`;
+        tdContent.dataset.dropType = 'cell';
+        tdContent.dataset.week = w;
+        tdContent.dataset.period = p;
+
+        const itemsWrap = document.createElement('div');
+        itemsWrap.className = 'cell-items';
+        const cellItems = cls.items.filter(
+          i => i.location.type === 'cell' && i.location.week === w && i.location.period === p
+        );
+        cellItems.forEach(item => itemsWrap.appendChild(createPlanChip(item)));
+
+        if (movingPlanId) {
+          tdContent.classList.add('is-place-target');
+          tdContent.addEventListener('click', () => {
+            movePlanItemToLocation(movingPlanId, { type: 'cell', week: w, period: p });
+          });
+        }
+
+        tdContent.appendChild(itemsWrap);
+        tr.appendChild(tdContent);
+        tbody.appendChild(tr);
       }
-      tdWeek.innerHTML = `第 ${w} 週${weekRangeHtml}`;
-      tr.appendChild(tdWeek);
     }
 
-    const tdPeriod = document.createElement('td');
-    tdPeriod.className = 'period-cell';
-    const pinLabel = isCurrentTodayRow ? (isPinned ? '★ 今日進度' : '● 今日進度') : '設為今日';
-    const pinClass = isCurrentTodayRow ? (isPinned ? 'is-pinned' : 'is-auto-today') : '';
-
-    let periodDateHtml = '';
-    if (slotInfo.date) {
-      periodDateHtml = `<span class="period-date-tag">${slotInfo.shortDate} (${slotInfo.weekdayShort})</span>`;
-    } else if (slotInfo.weekdayName) {
-      periodDateHtml = `<span class="period-date-tag">(${slotInfo.weekdayName})</span>`;
-    }
-
-    tdPeriod.innerHTML = `
-      <div class="period-cell-inner">
-        <span>第 ${p} 節</span>
-        ${periodDateHtml}
-        <button type="button" class="pin-today-btn ${pinClass}" title="指定此節為首頁 Today's Briefing 的今日進度">${pinLabel}</button>
-      </div>
-    `;
-
-    tdPeriod.querySelector('.pin-today-btn').addEventListener('click', () => {
-      if (isPinned && isCurrentTodayRow) {
-        cls.pinnedSlot = null;
-        showToast('已取消手動釘選，改回自動偵測今日進度');
-      } else {
-        cls.pinnedSlot = { week: w, period: p, date: today };
-        showToast(`已將「${cls.name}」第 ${w} 週第 ${p} 節設為今日進度`);
-      }
-      saveState();
-      renderTeaching();
-      renderBriefing();
-    });
-
-    tr.appendChild(tdPeriod);
-
-    const tdContent = document.createElement('td');
-    tdContent.className = `drop-cell drop-zone${isCurrentTodayRow ? ' today-highlight' : ''}`;
-    tdContent.dataset.dropType = 'cell';
-    tdContent.dataset.week = w;
-    tdContent.dataset.period = p;
-
-    const itemsWrap = document.createElement('div');
-    itemsWrap.className = 'cell-items';
-    const cellItems = cls.items.filter(
-      i => i.location.type === 'cell' && i.location.week === w && i.location.period === p
-    );
-    cellItems.forEach(item => itemsWrap.appendChild(createPlanChip(item)));
-    if (movingPlanId) {
-       tdContent.classList.add('is-place-target');
-       tdContent.addEventListener('click', () => {
-         movePlanItemToLocation(movingPlanId, { type: 'cell', week: w, period: p });
-       });
-     }
-    tdContent.appendChild(itemsWrap);
-    tr.appendChild(tdContent);
-    tbody.appendChild(tr);
-  }
-}
     if (isOverviewOpen) renderScheduleOverview();
   }
 
+  // ==================== 全螢幕課表總覽模式 ====================
   function openScheduleOverview() {
     isOverviewOpen = true;
     const overlay = document.getElementById('scheduleOverviewOverlay');
@@ -2972,6 +2990,158 @@ for (let w = 1; w <= cls.weeks; w++) {
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
+  }
+
+  function attachOverviewChipInteractions(chip, item) {
+    chip.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+      const isTouch = e.pointerType !== 'mouse';
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let lastClientX = startX;
+      let lastClientY = startY;
+      let isDragging = false;
+      let ghost = null;
+      let currentDropZone = null;
+      let longPressTimer = null;
+      let autoScrollRaf = null;
+
+      const onTouchMove = (te) => {
+        if (isDragging) te.preventDefault();
+      };
+
+      const runAutoScroll = () => {
+        if (!isDragging) return;
+        const bodyEl = document.getElementById('overviewBody');
+        if (bodyEl && (bodyEl.scrollHeight > bodyEl.clientHeight || bodyEl.scrollWidth > bodyEl.clientWidth)) {
+          const rect = bodyEl.getBoundingClientRect();
+          const edge = 56;
+          let dy = 0;
+          let dx = 0;
+
+          if (lastClientY < rect.top + edge) {
+            dy = -Math.ceil(((rect.top + edge - lastClientY) / edge) * 10);
+          } else if (lastClientY > rect.bottom - edge) {
+            dy = Math.ceil(((lastClientY - (rect.bottom - edge)) / edge) * 10);
+          }
+
+          if (lastClientX < rect.left + edge) {
+            dx = -Math.ceil(((rect.left + edge - lastClientX) / edge) * 10);
+          } else if (lastClientX > rect.right - edge) {
+            dx = Math.ceil(((lastClientX - (rect.right - edge)) / edge) * 10);
+          }
+
+          if (dy !== 0 || dx !== 0) {
+            bodyEl.scrollTop += dy;
+            bodyEl.scrollLeft += dx;
+            moveGhost(lastClientX, lastClientY);
+          }
+        }
+        autoScrollRaf = requestAnimationFrame(runAutoScroll);
+      };
+
+      const beginDrag = (clientX, clientY) => {
+        if (isDragging) return;
+        isDragging = true;
+        if (isTouch) {
+          document.body.classList.add('is-touch-dragging');
+          if (navigator.vibrate) navigator.vibrate(15);
+        }
+        chip.classList.add('dragging-source');
+
+        ghost = chip.cloneNode(true);
+        ghost.classList.remove('dragging-source');
+        ghost.classList.add('drag-ghost');
+        ghost.style.width = `${chip.offsetWidth}px`;
+        document.body.appendChild(ghost);
+        moveGhost(clientX, clientY);
+        autoScrollRaf = requestAnimationFrame(runAutoScroll);
+      };
+
+      const moveGhost = (clientX, clientY) => {
+        lastClientX = clientX;
+        lastClientY = clientY;
+        if (!ghost) return;
+        ghost.style.left = `${clientX - ghost.offsetWidth / 2}px`;
+        ghost.style.top = `${clientY - ghost.offsetHeight / 2}px`;
+
+        const elements = document.elementsFromPoint(clientX, clientY);
+        const zone = elements.find(el => el.classList && el.classList.contains('ov-drop-zone')) || null;
+
+        if (currentDropZone !== zone) {
+          if (currentDropZone) currentDropZone.classList.remove('drag-over');
+          currentDropZone = zone;
+          if (currentDropZone) currentDropZone.classList.add('drag-over');
+        }
+      };
+
+      longPressTimer = setTimeout(() => beginDrag(startX, startY), 260);
+
+      const onPointerMove = (moveEvent) => {
+        const dist = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+        if (!isDragging) {
+          const threshold = isTouch ? 12 : 8;
+          if (dist > threshold) {
+            clearTimeout(longPressTimer);
+            if (!isTouch) {
+              beginDrag(moveEvent.clientX, moveEvent.clientY);
+            } else {
+              cleanup();
+            }
+          }
+        } else {
+          moveEvent.preventDefault();
+          moveGhost(moveEvent.clientX, moveEvent.clientY);
+        }
+      };
+
+      const onPointerUp = () => {
+        clearTimeout(longPressTimer);
+
+        if (isDragging) {
+          if (currentDropZone) {
+            const targetWeek = parseInt(currentDropZone.dataset.week, 10);
+            const targetPeriod = parseInt(currentDropZone.dataset.period, 10);
+            const isSameSlot =
+              item.location &&
+              item.location.type === 'cell' &&
+              item.location.week === targetWeek &&
+              item.location.period === targetPeriod;
+
+            if (!isSameSlot && targetWeek >= 1 && targetPeriod >= 1) {
+              movePlanItemToLocation(item.id, {
+                type: 'cell',
+                week: targetWeek,
+                period: targetPeriod
+              });
+            }
+          }
+        } else {
+          openPlanEditModal(item.id);
+        }
+
+        cleanup();
+      };
+
+      const cleanup = () => {
+        clearTimeout(longPressTimer);
+        if (autoScrollRaf) cancelAnimationFrame(autoScrollRaf);
+        if (ghost) ghost.remove();
+        if (currentDropZone) currentDropZone.classList.remove('drag-over');
+        chip.classList.remove('dragging-source');
+        document.body.classList.remove('is-touch-dragging');
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', cleanup);
+        if (isTouch) window.removeEventListener('touchmove', onTouchMove);
+      };
+
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', cleanup);
+      if (isTouch) window.addEventListener('touchmove', onTouchMove, { passive: false });
+    });
   }
 
   function renderScheduleOverview() {
@@ -3046,7 +3216,9 @@ for (let w = 1; w <= cls.weeks; w++) {
         );
 
         const cell = document.createElement('div');
-        cell.className = `ov-cell${isToday ? ' is-today' : ''}`;
+        cell.className = `ov-cell ov-drop-zone${isToday ? ' is-today' : ''}`;
+        cell.dataset.week = w;
+        cell.dataset.period = p;
 
         if (slotInfo.shortDate || isToday) {
           const head = document.createElement('div');
@@ -3062,12 +3234,12 @@ for (let w = 1; w <= cls.weeks; w++) {
         itemsWrap.className = 'ov-items';
 
         cellItems.forEach(item => {
-          const chip = document.createElement('button');
-          chip.type = 'button';
+          const chip = document.createElement('div');
           chip.className = `ov-chip${item.completed ? ' is-completed' : ''}`;
+          chip.dataset.itemId = item.id;
           chip.style.backgroundColor = item.color;
           chip.style.color = getContrastColor(item.color);
-          chip.title = `${item.name}${item.type ? `（${item.type}）` : ''}${item.desc ? `\n備註：${item.desc}` : ''}\n點擊檢視或編輯`;
+          chip.title = `${item.name}${item.type ? `（${item.type}）` : ''}${item.desc ? `\n備註：${item.desc}` : ''}\n拖曳或長按可移位｜點擊編輯`;
           chip.innerHTML = `
             <div class="ov-chip-top">
               ${item.completed ? '<span>✓</span>' : ''}
@@ -3076,7 +3248,7 @@ for (let w = 1; w <= cls.weeks; w++) {
             </div>
             ${item.desc ? `<div class="ov-chip-desc">${escapeHtml(item.desc)}</div>` : ''}
           `;
-          chip.addEventListener('click', () => openPlanEditModal(item.id));
+          attachOverviewChipInteractions(chip, item);
           itemsWrap.appendChild(chip);
         });
 
@@ -3088,7 +3260,8 @@ for (let w = 1; w <= cls.weeks; w++) {
 
   // ==================== 第二部分：待辦事項平台 ====================
   function initTodo() {
-    document.getElementById('todoDate').value = getTodayStr();
+    const todoDateEl = document.getElementById('todoDate');
+    if (todoDateEl) todoDateEl.value = getTodayStr();
 
     on('openSourceModalBtn', 'click', () => {
       renderSourceManager();
@@ -3182,6 +3355,7 @@ for (let w = 1; w <= cls.weeks; w++) {
       document.getElementById('editTodoSource')
     ];
     selects.forEach(sel => {
+      if (!sel) return;
       const prev = sel.value;
       sel.innerHTML = state.sources
         .map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`)
@@ -3190,14 +3364,17 @@ for (let w = 1; w <= cls.weeks; w++) {
     });
 
     const filterSel = document.getElementById('todoFilterSource');
-    const prevFilter = filterSel.value;
-    filterSel.innerHTML = '<option value="all">全部來源</option>' +
-      state.sources.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-    filterSel.value = state.sources.some(s => s.id === prevFilter) ? prevFilter : 'all';
+    if (filterSel) {
+      const prevFilter = filterSel.value;
+      filterSel.innerHTML = '<option value="all">全部來源</option>' +
+        state.sources.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+      filterSel.value = state.sources.some(s => s.id === prevFilter) ? prevFilter : 'all';
+    }
   }
 
   function renderSourceManager() {
     const list = document.getElementById('sourceManagerList');
+    if (!list) return;
     list.innerHTML = '';
     state.sources.forEach(src => {
       const row = document.createElement('div');
@@ -3498,8 +3675,10 @@ for (let w = 1; w <= cls.weeks; w++) {
   // ==================== 第三部分：活動提醒平台 ====================
   function initEvents() {
     const today = getTodayStr();
-    document.getElementById('eventDate').value = today;
-    document.getElementById('eventRemindDate').value = today;
+    const eventDateEl = document.getElementById('eventDate');
+    const eventRemindEl = document.getElementById('eventRemindDate');
+    if (eventDateEl) eventDateEl.value = today;
+    if (eventRemindEl) eventRemindEl.value = today;
 
     on('addEventBtn', 'click', () => {
       const nameEl = document.getElementById('eventName');
@@ -3573,6 +3752,7 @@ for (let w = 1; w <= cls.weeks; w++) {
       closeModal('eventEditModal');
       showToast('已更新活動資訊');
     });
+
     // 小日曆切換與快速帶入日期
     on('calPrevBtn', 'click', () => {
       calMonth -= 1;
@@ -3901,13 +4081,21 @@ for (let w = 1; w <= cls.weeks; w++) {
     openModal('eventEditModal');
   }
 
-  // ==================== 啟動渲染 ====================
+  // ==================== 啟動渲染（模組錯誤隔離） ====================
+  function safeRun(label, fn) {
+    try {
+      fn();
+    } catch (err) {
+      console.error(`[${label}] 渲染發生錯誤:`, err);
+    }
+  }
+
   function renderAll() {
-    renderTeaching();
-    renderSourceOptions();
-    renderTodos();
-    renderEvents();
-    renderBriefing();
+    safeRun('教學進度平台', renderTeaching);
+    safeRun('任務來源選項', renderSourceOptions);
+    safeRun('待辦事項平台', renderTodos);
+    safeRun('活動提醒平台', renderEvents);
+    safeRun('今日簡報', renderBriefing);
   }
 
   initHeader();

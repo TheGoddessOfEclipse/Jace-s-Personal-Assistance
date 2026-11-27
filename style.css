@@ -38,6 +38,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+body.is-touch-dragging {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.is-overview-open {
+  overflow: hidden;
+}
+
 /* ==================== Header & Navigation ==================== */
 .top-header {
   background: var(--bg-card);
@@ -212,6 +222,30 @@ h3 {
   display: none !important;
 }
 
+/* 電腦版維持透明結構與隱藏行動端專屬元件 */
+.header-actions-row,
+.mobile-sheet-wrap,
+.chip-content-scroll,
+.mobile-card-details-wrap,
+.mobile-details-content {
+  display: contents;
+}
+
+.mobile-only-btn,
+.chip-move-btn,
+.chip-more-btn,
+.mobile-teaching-actions,
+.mobile-sheet-header,
+.mobile-sheet-footer,
+.mobile-current-class-row,
+.mobile-class-dropdown-wrap,
+.card-more-btn,
+.mobile-details-toggle,
+.mobile-only-event-date,
+.mobile-only-detail {
+  display: none;
+}
+
 /* ==================== Forms & Buttons ==================== */
 .form-stack {
   display: flex;
@@ -263,6 +297,10 @@ textarea:focus {
 
 textarea {
   resize: vertical;
+}
+
+.api-key-masked {
+  -webkit-text-security: disc;
 }
 
 button {
@@ -331,12 +369,6 @@ button {
   background: var(--accent);
   border-color: var(--accent);
   color: #FFFFFF;
-}
-
-.danger-outline:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-  background: #FDF2F2;
 }
 
 .btn-danger {
@@ -518,10 +550,21 @@ button {
   border-radius: 99px;
 }
 
-.rpg-sub-tag {
+.rpg-dialogue-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rpg-ai-badge {
   font-size: 11px;
-  letter-spacing: 0.16em;
-  color: var(--ink-muted);
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid #C7D6C8;
+  letter-spacing: 0.04em;
 }
 
 .rpg-dialogue-text {
@@ -530,6 +573,16 @@ button {
   line-height: 1.85;
   color: var(--ink-primary);
   padding-right: 16px;
+}
+
+.rpg-dialogue-text.is-loading {
+  color: var(--ink-muted);
+  animation: aiPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes aiPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
 }
 
 .rpg-summary-pills {
@@ -551,20 +604,6 @@ button {
   color: var(--accent);
   font-weight: 600;
   margin: 0 2px;
-}
-
-.rpg-caret {
-  position: absolute;
-  right: 18px;
-  bottom: 12px;
-  font-size: 14px;
-  color: var(--accent);
-  animation: rpgBlink 1.3s ease-in-out infinite;
-}
-
-@keyframes rpgBlink {
-  0%, 100% { opacity: 0.25; transform: translateY(0); }
-  50% { opacity: 1; transform: translateY(3px); }
 }
 
 /* 單一整合條列清單 */
@@ -811,11 +850,18 @@ button {
 
 .panel-toolbar {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.toolbar-top-row {
+  display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 16px;
 }
 
 .grid-config-form {
@@ -836,6 +882,49 @@ button {
 .inline-field input {
   width: 72px;
   text-align: center;
+}
+
+.inline-field input[type="date"] {
+  width: 146px;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.period-weekday-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+}
+
+.period-weekday-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.weekday-slot-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+}
+
+.weekday-slot-item select {
+  width: auto;
+  min-width: 72px;
+  padding: 3px 6px;
+  font-size: 12.5px;
+  background: #FFFFFF;
 }
 
 /* 多選批次複製工具列 */
@@ -889,6 +978,49 @@ button {
   background: #FFFFFF;
 }
 
+/* 點選排課中的浮動提示與目標高亮 */
+.mobile-move-banner {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 80;
+  background: var(--ink-primary);
+  color: #FFFFFF;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mobile-move-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.mobile-move-text span {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.mobile-move-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-move-banner .btn-ghost-sm {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
 .teaching-layout {
   display: grid;
   grid-template-columns: 330px 1fr;
@@ -900,8 +1032,6 @@ button {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  position: sticky;
-  top: 128px;
 }
 
 .color-picker-row {
@@ -939,13 +1069,8 @@ input[type="color"] {
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #FFF;
+  background: #FFFFFF;
   cursor: pointer;
-}
-
-.full-color-input {
-  width: 100% !important;
-  height: 38px !important;
 }
 
 .staging-header {
@@ -956,9 +1081,14 @@ input[type="color"] {
   margin-bottom: 12px;
 }
 
-.staging-header-left {
+.staging-header-left,
+.staging-header-right {
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.staging-header-left {
   gap: 8px;
 }
 
@@ -979,6 +1109,11 @@ input[type="color"] {
   align-content: flex-start;
   gap: 8px;
   transition: background 0.2s, border-color 0.2s;
+}
+
+.staging-list.is-place-target {
+  background: var(--terracotta-soft);
+  border-color: var(--terracotta);
 }
 
 .empty-drop-hint {
@@ -1021,11 +1156,11 @@ input[type="color"] {
 }
 
 .col-week {
-  width: 88px;
+  width: 104px;
 }
 
 .col-period {
-  width: 112px;
+  width: 132px;
 }
 
 .week-cell {
@@ -1034,6 +1169,16 @@ input[type="color"] {
   font-weight: 600;
   background: #FAF8F4;
   color: var(--ink-primary);
+}
+
+.week-date-range {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-muted);
+  white-space: nowrap;
 }
 
 .period-cell {
@@ -1047,6 +1192,13 @@ input[type="color"] {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+}
+
+.period-date-tag {
+  font-size: 11.5px;
+  color: var(--accent);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .pin-today-btn {
@@ -1086,6 +1238,13 @@ input[type="color"] {
   background: #F6FAF6;
 }
 
+.drop-cell.is-place-target {
+  background: #F4F8F3;
+  outline: 1.5px dashed var(--accent);
+  outline-offset: -3px;
+  cursor: pointer;
+}
+
 .cell-items {
   display: flex;
   flex-wrap: wrap;
@@ -1099,7 +1258,7 @@ input[type="color"] {
   outline-offset: -3px;
 }
 
-/* 教學事項標籤（含快速編輯／複製按鈕與多選樣式） */
+/* 教學事項標籤（含快速編輯／複製按鈕、多選與備註樣式） */
 .plan-chip {
   display: inline-flex;
   align-items: center;
@@ -1110,6 +1269,7 @@ input[type="color"] {
   font-weight: 500;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
   cursor: grab;
   border: 1px solid rgba(51, 48, 46, 0.12);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -1120,6 +1280,13 @@ input[type="color"] {
 .plan-chip:hover {
   transform: translateY(-1px);
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.09);
+}
+
+.plan-chip.has-desc {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 6px 10px;
 }
 
 .plan-chip.completed {
@@ -1142,6 +1309,35 @@ input[type="color"] {
   outline: 2.5px solid var(--accent);
   outline-offset: 1px;
   box-shadow: 0 3px 10px rgba(91, 110, 92, 0.28);
+}
+
+.plan-chip.is-moving {
+  outline: 2.5px solid var(--terracotta);
+  outline-offset: 2px;
+  box-shadow: 0 4px 12px rgba(194, 122, 99, 0.35);
+}
+
+.plan-chip.dragging-source {
+  opacity: 0.35;
+}
+
+.chip-main-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip-desc {
+  width: 100%;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  opacity: 0.85;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(128, 128, 128, 0.32);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .chip-select-box {
@@ -1206,10 +1402,6 @@ input[type="color"] {
 .chip-action-btn:hover {
   opacity: 1;
   background: rgba(255, 255, 255, 0.55);
-}
-
-.plan-chip.dragging-source {
-  opacity: 0.35;
 }
 
 .drag-ghost {
@@ -1461,7 +1653,7 @@ input[type="color"] {
   color: var(--danger);
 }
 
-/* ==================== Event Card ==================== */
+/* ==================== Event Card & Calendar ==================== */
 .event-card {
   background: var(--bg-soft);
   border: 1px solid var(--border);
@@ -1500,6 +1692,12 @@ input[type="color"] {
   color: var(--ink-secondary);
 }
 
+.event-badge.snoozed {
+  background: #EFECE6;
+  color: var(--ink-secondary);
+  border: 1px solid var(--border-strong);
+}
+
 .event-details-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -1511,6 +1709,229 @@ input[type="color"] {
 .event-detail-item strong {
   color: var(--ink-primary);
   font-weight: 500;
+}
+
+.event-calendar-card {
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  color: var(--ink-primary);
+}
+
+.event-cal-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.cal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cal-header h3 {
+  margin-bottom: 0;
+  font-size: 15px;
+  color: var(--ink-primary);
+}
+
+.cal-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.cal-nav button {
+  color: var(--ink-secondary);
+  border-color: var(--border-strong);
+  background: var(--bg-card);
+}
+
+.cal-nav button:hover {
+  color: var(--ink-primary);
+  border-color: var(--accent);
+}
+
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  margin-bottom: 6px;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-day {
+  position: relative;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-primary);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.cal-day:hover:not(.is-empty) {
+  background: var(--bg-soft);
+  border-color: var(--border-strong);
+  color: var(--ink-primary);
+}
+
+.cal-day.is-empty {
+  cursor: default;
+  pointer-events: none;
+}
+
+.cal-day.has-upcoming {
+  background: var(--terracotta-soft);
+  font-weight: 600;
+  color: var(--terracotta);
+}
+
+.cal-day.has-past-only {
+  background: #F1EFEA;
+  color: var(--ink-secondary);
+}
+
+.cal-day.is-today {
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.cal-day.is-selected {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #FFFFFF !important;
+}
+
+.cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  margin-top: 1px;
+}
+
+.cal-dot.upcoming {
+  background: var(--terracotta);
+}
+
+.cal-dot.past {
+  background: var(--ink-muted);
+}
+
+.cal-day.is-selected .cal-dot {
+  background: #FFFFFF;
+}
+
+.cal-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--ink-secondary);
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.legend-dot.upcoming {
+  background: var(--terracotta);
+}
+
+.legend-dot.past {
+  background: var(--ink-muted);
+}
+
+.cal-detail-pane {
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+  min-height: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cal-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cal-selected-date {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-primary);
+}
+
+.cal-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.cal-detail-item {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--terracotta);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cal-detail-item.is-past {
+  border-left-color: var(--ink-muted);
+  opacity: 0.85;
+}
+
+.cal-detail-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.cal-detail-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink-primary);
+}
+
+.cal-detail-meta {
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+}
+
+.cal-detail-note {
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: pre-wrap;
 }
 
 /* ==================== Modals ==================== */
@@ -1648,6 +2069,19 @@ input[type="color"] {
   color: rgba(255, 255, 255, 0.88);
 }
 
+.resolve-option-btn.danger {
+  border-color: #E3C2C2;
+}
+
+.resolve-option-btn.danger .resolve-opt-title {
+  color: var(--danger);
+}
+
+.resolve-option-btn.danger:hover {
+  border-color: var(--danger);
+  background: #FDF2F2;
+}
+
 .resolve-opt-title {
   font-family: var(--font-serif);
   font-size: 15px;
@@ -1657,6 +2091,40 @@ input[type="color"] {
 .resolve-opt-desc {
   font-size: 12px;
   color: var(--ink-secondary);
+}
+
+.resolve-custom-box {
+  background: var(--bg-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resolve-custom-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.resolve-custom-row input[type="date"] {
+  flex: 1;
+  background: #FFFFFF;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.api-key-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.api-key-row input {
+  flex: 1;
 }
 
 /* Source Manager */
@@ -1692,6 +2160,79 @@ input[type="color"] {
   align-items: center;
   gap: 10px;
   flex: 1;
+}
+
+/* 頭像等比例裁切視窗 */
+.crop-stage-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 18px;
+}
+
+.crop-viewport {
+  position: relative;
+  width: 228px;
+  height: 279px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow-md);
+  background: #EFECE6;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.crop-viewport:active {
+  cursor: grabbing;
+}
+
+#avatarCropCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+
+.crop-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
+  background-size: 33.333% 33.333%;
+  background-position: -1px -1px;
+}
+
+.crop-controls {
+  padding: 0 6px;
+}
+
+.crop-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crop-zoom-label {
+  font-size: 13px;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+#avatarZoomSlider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.crop-zoom-value {
+  font-size: 12.5px;
+  color: var(--ink-secondary);
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ==================== Firebase 同步與 Google 登入閘門 ==================== */
@@ -1835,1572 +2376,7 @@ input[type="color"] {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ==================== Responsive ==================== */
-@media (max-width: 960px) {
-  .teaching-layout,
-  .two-col-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .staging-sidebar,
-  .form-panel {
-    position: static;
-  }
-}
-
-@media (max-width: 680px) {
-  .rpg-stage {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .rpg-dialogue-box {
-    width: 100%;
-  }
-
-  .rpg-dialogue-box::before {
-    left: 50%;
-    top: -10px;
-    bottom: auto;
-    transform: translateX(-50%) rotate(135deg);
-  }
-}
-
-@media (max-width: 600px) {
-  .container {
-    padding: 16px;
-  }
-
-  .field-row {
-    flex-direction: column;
-  }
-
-  .col-week {
-    width: 66px;
-  }
-
-  .col-period {
-    width: 82px;
-  }
-}
-
-/* ==================== 活動提醒詢問視窗（指定日期與暫停標籤） ==================== */
-.resolve-custom-box {
-  background: var(--bg-soft);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  padding: 13px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.resolve-custom-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.resolve-custom-row input[type="date"] {
-  flex: 1;
-  background: #FFFFFF;
-  padding: 6px 10px;
-  font-size: 13px;
-}
-
-.event-badge.snoozed {
-  background: #EFECE6;
-  color: var(--ink-secondary);
-  border: 1px solid var(--border-strong);
-}
-
-/* ==================== 頭像等比例裁切視窗 ==================== */
-.crop-stage-wrap {
-  display: flex;
-  justify-content: center;
-  margin: 8px 0 18px;
-}
-
-.crop-viewport {
-  position: relative;
-  width: 228px;
-  height: 279px;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 2px solid var(--accent);
-  box-shadow: var(--shadow-md);
-  background: #EFECE6;
-  cursor: grab;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.crop-viewport:active {
-  cursor: grabbing;
-}
-
-#avatarCropCanvas {
-  width: 100%;
-  height: 100%;
-  display: block;
-  touch-action: none;
-}
-
-.crop-grid-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
-  background-size: 33.333% 33.333%;
-  background-position: -1px -1px;
-}
-
-.crop-controls {
-  padding: 0 6px;
-}
-
-.crop-zoom-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.crop-zoom-label {
-  font-size: 13px;
-  color: var(--ink-secondary);
-  white-space: nowrap;
-}
-
-#avatarZoomSlider {
-  flex: 1;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.crop-zoom-value {
-  font-size: 12.5px;
-  color: var(--ink-secondary);
-  min-width: 44px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ==================== AI 秘書對話控制與設定 ==================== */
-.rpg-dialogue-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.rpg-ai-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid #C7D6C8;
-  letter-spacing: 0.04em;
-}
-
-.rpg-dialogue-text.is-loading {
-  color: var(--ink-muted);
-  animation: aiPulse 1.4s ease-in-out infinite;
-}
-
-@keyframes aiPulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
-}
-
-.api-key-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.api-key-row input {
-  flex: 1;
-}
-
-/* ==================== 活動平台：小日曆與當日詳情 ==================== */
-.event-calendar-card {
-  margin-bottom: 18px;
-  padding: 18px 20px;
-}
-
-.event-cal-layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 24px;
-  align-items: start;
-}
-
-.cal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.cal-header h3 {
-  margin-bottom: 0;
-  font-size: 15px;
-}
-
-.cal-nav {
-  display: flex;
-  gap: 4px;
-}
-
-.cal-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--ink-muted);
-  margin-bottom: 6px;
-}
-
-.cal-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-}
-
-.cal-day {
-  position: relative;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--ink-primary);
-  font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-
-.cal-day:hover:not(.is-empty) {
-  background: var(--bg-soft);
-  border-color: var(--border-strong);
-}
-
-.cal-day.is-empty {
-  cursor: default;
-  pointer-events: none;
-}
-
-.cal-day.has-upcoming {
-  background: var(--terracotta-soft);
-  font-weight: 600;
-  color: var(--terracotta);
-}
-
-.cal-day.has-past-only {
-  background: #F1EFEA;
-  color: var(--ink-secondary);
-}
-
-.cal-day.is-today {
-  border-color: var(--accent);
-  font-weight: 600;
-}
-
-.cal-day.is-selected {
-  background: var(--accent) !important;
-  border-color: var(--accent) !important;
-  color: #FFFFFF !important;
-}
-
-.cal-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  margin-top: 1px;
-}
-
-.cal-dot.upcoming {
-  background: var(--terracotta);
-}
-
-.cal-dot.past {
-  background: var(--ink-muted);
-}
-
-.cal-day.is-selected .cal-dot {
-  background: #FFFFFF;
-}
-
-.cal-legend {
-  display: flex;
-  gap: 14px;
-  margin-top: 10px;
-  font-size: 11.5px;
-  color: var(--ink-muted);
-}
-
-.legend-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  margin-right: 4px;
-  vertical-align: middle;
-}
-
-.legend-dot.upcoming {
-  background: var(--terracotta);
-}
-
-.legend-dot.past {
-  background: var(--ink-muted);
-}
-
-.cal-detail-pane {
-  border-left: 1px solid var(--border);
-  padding-left: 20px;
-  min-height: 230px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.cal-detail-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.cal-selected-date {
-  font-family: var(--font-serif);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink-primary);
-}
-
-.cal-detail-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.cal-detail-item {
-  background: var(--bg-soft);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--terracotta);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.cal-detail-item.is-past {
-  border-left-color: var(--ink-muted);
-  opacity: 0.85;
-}
-
-.cal-detail-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.cal-detail-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--ink-primary);
-}
-
-.cal-detail-meta {
-  font-size: 12.5px;
-  color: var(--ink-secondary);
-}
-
-.cal-detail-note {
-  font-size: 12px;
-  color: var(--ink-muted);
-  white-space: pre-wrap;
-}
-
-@media (max-width: 780px) {
-  .event-cal-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .cal-detail-pane {
-    border-left: none;
-    border-top: 1px solid var(--border);
-    padding-left: 0;
-    padding-top: 14px;
-    min-height: auto;
-  }
-}
-
-/* ==================== 修正小日曆在白底卡片上的字體顏色 ==================== */
-.event-calendar-card {
-  color: var(--ink-primary);
-}
-
-.cal-header h3 {
-  color: var(--ink-primary);
-}
-
-.cal-nav button {
-  color: var(--ink-secondary);
-  border-color: var(--border-strong);
-  background: var(--bg-card);
-}
-
-.cal-nav button:hover {
-  color: var(--ink-primary);
-  border-color: var(--accent);
-}
-
-.cal-weekdays {
-  color: var(--ink-secondary);
-  font-weight: 500;
-}
-
-.cal-day {
-  color: var(--ink-primary);
-}
-
-.cal-day:hover:not(.is-empty) {
-  background: var(--bg-soft);
-  color: var(--ink-primary);
-}
-
-.cal-day.has-upcoming {
-  color: var(--terracotta);
-}
-
-.cal-day.has-past-only {
-  color: var(--ink-secondary);
-}
-
-.cal-day.is-selected {
-  color: #FFFFFF !important;
-}
-
-.cal-legend {
-  color: var(--ink-secondary);
-}
-
-.cal-selected-date {
-  color: var(--ink-primary);
-}
-
-/* ==================== 補上小日曆星期網格排版 ==================== */
-.cal-weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--ink-secondary);
-  margin-bottom: 6px;
-  font-weight: 500;
-}
-
-/* ==================== 教學進度平台：第一週日期與各節星期設定 ==================== */
-.panel-toolbar {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 14px;
-}
-
-.toolbar-top-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.inline-field input[type="date"] {
-  width: 146px;
-  text-align: left;
-  padding: 7px 10px;
-  font-size: 13px;
-}
-
-.period-weekday-bar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--border);
-}
-
-.period-weekday-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-secondary);
-  white-space: nowrap;
-}
-
-.weekday-slot-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12.5px;
-  color: var(--ink-secondary);
-  background: var(--bg-soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
-}
-
-.weekday-slot-item select {
-  width: auto;
-  min-width: 72px;
-  padding: 3px 6px;
-  font-size: 12.5px;
-  background: #FFFFFF;
-}
-
-.col-week {
-  width: 104px;
-}
-
-.col-period {
-  width: 132px;
-}
-
-.week-date-range {
-  display: block;
-  margin-top: 4px;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--ink-muted);
-  white-space: nowrap;
-}
-
-.period-date-tag {
-  font-size: 11.5px;
-  color: var(--accent);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-@media (max-width: 600px) {
-  .col-week {
-    width: 78px;
-  }
-
-  .col-period {
-    width: 98px;
-  }
-}
-
-/* ==================== 教學事項標籤：顯示詳細備註 ==================== */
-.plan-chip.has-desc {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 6px 10px;
-}
-
-.chip-main-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.chip-desc {
-  width: 100%;
-  font-size: 11.5px;
-  font-weight: 400;
-  line-height: 1.45;
-  opacity: 0.85;
-  padding-top: 3px;
-  border-top: 1px dashed rgba(128, 128, 128, 0.32);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-/* ==================== 教學進度平台：手機與平板專用互動與版面（不影響電腦版） ==================== */
-.plan-chip {
-  -webkit-touch-callout: none;
-}
-
-body.is-touch-dragging {
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-.staging-header-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 電腦版隱藏專用按鈕 */
-.mobile-only-btn,
-.chip-move-btn {
-  display: none;
-}
-
-/* 點選排課中的浮動提示與目標高亮 */
-.mobile-move-banner {
-  position: fixed;
-  top: 12px;
-  left: 12px;
-  right: 12px;
-  z-index: 80;
-  background: var(--ink-primary);
-  color: #FFFFFF;
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  box-shadow: var(--shadow-md);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.mobile-move-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 13px;
-}
-
-.mobile-move-text span {
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.mobile-move-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mobile-move-banner .btn-ghost-sm {
-  background: rgba(255, 255, 255, 0.14);
-  color: #FFFFFF;
-  border-color: rgba(255, 255, 255, 0.32);
-}
-
-.plan-chip.is-moving {
-  outline: 2.5px solid var(--terracotta);
-  outline-offset: 2px;
-  box-shadow: 0 4px 12px rgba(194, 122, 99, 0.35);
-}
-
-.drop-cell.is-place-target {
-  background: #F4F8F3;
-  outline: 1.5px dashed var(--accent);
-  outline-offset: -3px;
-  cursor: pointer;
-}
-
-.staging-list.is-place-target {
-  background: var(--terracotta-soft);
-  border-color: var(--terracotta);
-}
-
-/* 觸控裝置（含橫式平板）與窄螢幕：顯示課表項目的 ⇄ 移動按鈕 */
-@media (max-width: 960px), (pointer: coarse) {
-  .chip-move-btn {
-    display: inline-flex;
-  }
-}
-
-/* 手機與直式平板：待排區固定為底部可收合浮動條，不影響電腦雙欄 */
-@media (max-width: 960px) {
-  .mobile-only-btn {
-    display: inline-flex;
-    align-items: center;
-  }
-
-  .teaching-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .staging-sidebar {
-    display: contents;
-  }
-
-  .staging-sidebar > .card:not(.staging-box) {
-    order: 1;
-  }
-
-  .table-section {
-    order: 2;
-  }
-
-  .staging-box {
-    order: 3;
-    position: sticky;
-    bottom: 8px;
-    z-index: 35;
-    padding: 12px 14px;
-    border: 1.5px solid var(--accent);
-    box-shadow: 0 -6px 20px rgba(51, 48, 46, 0.14);
-    background: rgba(255, 255, 255, 0.97);
-    backdrop-filter: blur(6px);
-  }
-
-  .staging-box .staging-header {
-    margin-bottom: 8px;
-  }
-
-  .staging-box .staging-list {
-    min-height: 54px;
-    max-height: 112px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    overflow-y: hidden;
-    align-items: center;
-    padding: 8px;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .staging-box .staging-list .plan-chip {
-    flex-shrink: 0;
-    max-width: 240px;
-  }
-
-  .staging-box .staging-list .chip-desc {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .staging-box .empty-drop-hint {
-    padding: 8px 6px;
-    white-space: nowrap;
-  }
-
-  .staging-box.is-collapsed .staging-header {
-    margin-bottom: 0;
-  }
-
-  .staging-box.is-collapsed .staging-list {
-    display: none;
-  }
-}
-
-/* ==================== 行動端專屬優化：頁首同排、彈窗按鈕、固定課表視窗（不影響電腦版） ==================== */
-
-/* 電腦版維持透明結構、隱藏手機專用元件 */
-.header-actions-row,
-.mobile-sheet-wrap {
-  display: contents;
-}
-
-.mobile-teaching-actions,
-.mobile-sheet-header,
-.mobile-sheet-footer {
-  display: none;
-}
-
-/* 窄螢幕手機：讓 登出、匯出備份、匯入還原 併在同一排 */
-@media (max-width: 720px) {
-  .header-inner {
-    padding: 12px 16px 8px;
-    gap: 8px;
-  }
-
-  .brand h1 {
-    font-size: 20px;
-  }
-
-  .header-meta {
-    width: 100%;
-    gap: 6px 8px;
-  }
-
-  .today-pill,
-  .sync-pill {
-    font-size: 11.5px;
-    padding: 4px 10px;
-  }
-
-  .header-actions-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    flex-wrap: nowrap;
-  }
-
-  .header-actions-row .user-controls {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    flex: 0 1 auto;
-  }
-
-  .header-actions-row .user-email-pill {
-    min-width: 0;
-    flex: 0 1 auto;
-    max-width: 100%;
-    font-size: 11px;
-    padding: 4px 8px;
-  }
-
-  .header-actions-row .backup-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .header-actions-row .btn-ghost {
-    padding: 4px 8px;
-    font-size: 11.5px;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-}
-
-/* 手機與直式平板：進度表設定與新增收成按鈕彈窗 ＋ 固定課表捲動視窗 */
-@media (max-width: 960px) {
-  .top-header {
-    position: static;
-  }
-
-  .class-bar {
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    gap: 10px;
-  }
-
-  .mobile-teaching-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .mobile-teaching-actions button {
-    padding: 9px 12px;
-    font-size: 13.5px;
-    font-weight: 500;
-  }
-
-  /* 彈窗容器：平常隱藏，點按鈕才展開 */
-  .mobile-sheet-wrap {
-    display: none;
-  }
-
-  .mobile-sheet-wrap.is-open {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 120;
-    background: rgba(51, 48, 46, 0.5);
-    backdrop-filter: blur(2px);
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
-  }
-
-  .mobile-sheet-wrap.is-open > .card {
-    width: 100%;
-    max-width: 520px;
-    max-height: 86vh;
-    overflow-y: auto;
-    margin: 0;
-    padding: 18px;
-    box-shadow: var(--shadow-md);
-  }
-
-  .mobile-sheet-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 10px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--border);
-    font-family: var(--font-serif);
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--ink-primary);
-  }
-
-  .mobile-sheet-footer {
-    display: block;
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
-  }
-
-  .desktop-only-title {
-    display: none;
-  }
-
-  /* 固定課表視窗：只在視窗內部上下捲動，表頭凍結 */
-  .teaching-layout {
-    gap: 12px;
-  }
-
-  .table-section {
-    order: 1;
-    padding: 10px;
-  }
-
-  .table-wrapper {
-    max-height: 46vh;
-    min-height: 230px;
-    overflow-y: auto;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-  }
-
-  .progress-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 6;
-    background: var(--bg-soft);
-    box-shadow: inset 0 -1px 0 var(--border);
-  }
-
-  /* 待排區緊接在固定課表視窗正下方，一眼可見 */
-  .staging-box {
-    order: 2;
-    position: sticky;
-    bottom: 6px;
-    padding: 10px 12px;
-  }
-}
-
-/* ==================== 修正手機版待排區撐爆寬度導致整頁縮小（不影響電腦版） ==================== */
-@media (max-width: 960px) {
-  html,
-  body {
-    max-width: 100%;
-    overflow-x: clip;
-  }
-
-  .container,
-  .tab-panel,
-  .teaching-layout,
-  .table-section,
-  .table-wrapper,
-  .staging-box {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    box-sizing: border-box;
-  }
-
-  /* 待排區改為自動換行＋固定高度盒內上下捲動，不再橫向無限拉長 */
-  .staging-box .staging-list {
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    min-height: 56px;
-    max-height: 126px;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    align-content: flex-start;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    gap: 6px;
-  }
-
-  .staging-box .staging-list .plan-chip {
-    flex-shrink: 1;
-    max-width: 100%;
-  }
-
-  .staging-box .empty-drop-hint {
-    white-space: normal;
-  }
-}
-
-/* ==================== 課表手機版：欄位縮窄、日期不跑版、⋮ 收納鈕、方塊限兩排捲動（不影響電腦版） ==================== */
-
-/* 電腦版維持原結構，不顯示 ⋮ 按鈕 */
-.chip-content-scroll {
-  display: contents;
-}
-
-.chip-more-btn {
-  display: none;
-}
-
-@media (max-width: 960px) {
-  /* 第三欄標題：主標題一行、括號說明下一行 */
-  .col-content .th-sub {
-    display: block;
-    font-family: var(--font-sans);
-    font-size: 10.5px;
-    font-weight: 400;
-    color: var(--ink-muted);
-    margin-top: 2px;
-    line-height: 1.25;
-  }
-
-  /* 課表內課務方塊：三個功能鍵收納進 ⋮，內容限高兩排並可盒內捲動 */
-  .drop-cell .plan-chip,
-  .drop-cell .plan-chip.has-desc {
-    flex-direction: row;
-    align-items: flex-start;
-    width: 100%;
-    padding: 5px 4px 5px 8px;
-    gap: 4px;
-  }
-
-  .drop-cell .plan-chip .chip-actions {
-    display: none;
-  }
-
-  .drop-cell .plan-chip .chip-content-scroll {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1;
-    min-width: 0;
-    max-height: 44px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
-    padding-right: 2px;
-  }
-
-  .drop-cell .plan-chip .chip-main-row {
-    gap: 4px;
-    font-size: 12.5px;
-    line-height: 1.35;
-  }
-
-  .drop-cell .plan-chip .chip-type {
-    font-size: 10.5px;
-    padding: 0 5px;
-    line-height: 1.4;
-  }
-
-  .drop-cell .plan-chip .chip-desc {
-    font-size: 11px;
-    line-height: 1.35;
-    padding-top: 2px;
-  }
-
-  .drop-cell .plan-chip .chip-more-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    border: none;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.35);
-    color: inherit;
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1;
-    padding: 0;
-  }
-
-  .drop-cell .plan-chip .chip-more-btn:active {
-    background: rgba(255, 255, 255, 0.6);
-  }
-}
-
-@media (max-width: 720px) {
-  /* 縮窄週次與節次欄位，把空間留給學習內容 */
-  .col-week {
-    width: 54px;
-  }
-
-  .col-period {
-    width: 68px;
-  }
-
-  .progress-table th {
-    padding: 8px 4px;
-    font-size: 13px;
-  }
-
-  .week-cell,
-  .period-cell {
-    padding: 6px 3px;
-  }
-
-  .week-cell {
-    font-size: 12.5px;
-  }
-
-  /* 週次日期改上下兩行置中，徹底避免超出欄寬 */
-  .week-date-range {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 10px;
-    line-height: 1.25;
-    margin-top: 3px;
-    white-space: normal;
-  }
-
-  .period-cell {
-    font-size: 11.5px;
-  }
-
-  .period-cell-inner {
-    gap: 2px;
-  }
-
-  .period-date-tag {
-    font-size: 10.5px;
-    letter-spacing: -0.02em;
-  }
-
-  .pin-today-btn {
-    font-size: 10px;
-    padding: 1px 4px;
-    white-space: nowrap;
-  }
-
-  .drop-cell {
-    padding: 6px 5px;
-  }
-
-  .cell-items {
-    gap: 5px;
-  }
-}
-
-/* ==================== 手機版修正：班級標頭三列＋下拉選單、週次不換行、課務方塊水平對齊（不影響電腦版） ==================== */
-
-/* 電腦版隱藏手機專用班級顯示與下拉選單 */
-.mobile-current-class-row,
-.mobile-class-dropdown-wrap {
-  display: none;
-}
-
-@media (max-width: 960px) {
-  /* 課表上方標頭區：三列版面 */
-  .class-bar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    padding: 12px;
-    overflow: visible;
-  }
-
-  .class-bar-left {
-    display: none;
-  }
-
-  /* 第 1 列：目前課表班級 */
-  .mobile-current-class-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .mobile-class-label {
-    font-size: 12.5px;
-    color: var(--ink-muted);
-    font-weight: 500;
-  }
-
-  .mobile-current-class-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 12px;
-    border-radius: 999px;
-    background: var(--accent);
-    color: #FFFFFF;
-    font-size: 13.5px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-
-  /* 第 2 列（班級切換 + 新增班級）與 第 3 列（重新命名 + 刪除班級） */
-  .class-bar-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    width: 100%;
-  }
-
-  .class-bar-actions > button,
-  .mobile-class-switch-btn {
-    width: 100%;
-    justify-content: center;
-    padding: 8px 10px;
-    font-size: 13px;
-  }
-
-  .mobile-class-dropdown-wrap {
-    display: block;
-    position: relative;
-    width: 100%;
-  }
-
-  .mobile-class-switch-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-  }
-
-  .mobile-class-switch-btn .dropdown-caret {
-    font-size: 11px;
-    opacity: 0.75;
-  }
-
-  .mobile-class-dropdown-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    min-width: 100%;
-    max-height: 220px;
-    overflow-y: auto;
-    background: var(--card-bg, #FFFFFF);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-md);
-    padding: 4px;
-    z-index: 95;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .mobile-class-dropdown-menu.hidden {
-    display: none;
-  }
-
-  .mobile-class-option {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 9px 12px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--ink-primary);
-    font-size: 13.5px;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .mobile-class-option.active {
-    background: var(--accent-soft, rgba(107, 128, 104, 0.14));
-    color: var(--accent);
-    font-weight: 600;
-  }
-
-  /* 課務方塊內容水平對齊（文字、標籤與右側 ⋮ 垂直置中於同一水平線） */
-  .drop-cell .plan-chip,
-  .drop-cell .plan-chip.has-desc {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 6px 5px 6px 9px;
-    gap: 6px;
-  }
-
-  .drop-cell .plan-chip .chip-actions {
-    display: none !important;
-  }
-
-  .drop-cell .plan-chip .chip-content-scroll {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    text-align: left;
-    gap: 2px;
-    flex: 1;
-    min-width: 0;
-    max-height: 46px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
-    padding: 0;
-  }
-
-  .drop-cell .plan-chip .chip-main-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    width: 100%;
-    gap: 5px;
-    font-size: 12.5px;
-    line-height: 1.4;
-  }
-
-  .drop-cell .plan-chip .chip-desc {
-    width: 100%;
-    text-align: left;
-    font-size: 11px;
-    line-height: 1.35;
-    padding-top: 2px;
-  }
-
-  .drop-cell .plan-chip .chip-more-btn {
-    align-self: center;
-  }
-}
-
-@media (max-width: 720px) {
-  /* 還原週次欄寬度並鎖定「第 X 週」單排不換行；只縮窄節次欄 */
-  .col-week {
-    width: 78px;
-  }
-
-  .col-period {
-    width: 64px;
-  }
-
-  .week-cell {
-    white-space: nowrap;
-    font-size: 12.5px;
-    padding: 6px 3px;
-  }
-
-  .week-date-range {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    justify-content: center;
-    white-space: nowrap;
-    font-size: 9.5px;
-    letter-spacing: -0.03em;
-    line-height: 1.3;
-    margin-top: 4px;
-  }
-}
-
-.api-key-masked {
-  -webkit-text-security: disc;
-}
-
-/* ==================== 手機版優化：待辦與活動卡片 ⋮ 收納鈕 ＋ 更多詳情折疊（不影響電腦版） ==================== */
-
-/* 電腦版維持原狀：隱藏手機專用按鈕與欄位，讓詳情容器完全透明 */
-.card-more-btn,
-.mobile-details-toggle,
-.mobile-only-event-date,
-.mobile-only-detail {
-  display: none;
-}
-
-.mobile-card-details-wrap,
-.mobile-details-content {
-  display: contents;
-}
-
-.resolve-option-btn.danger {
-  border-color: #E3C2C2;
-}
-
-.resolve-option-btn.danger .resolve-opt-title {
-  color: var(--danger);
-}
-
-.resolve-option-btn.danger:hover {
-  border-color: var(--danger);
-  background: #FDF2F2;
-}
-
-@media (max-width: 960px) {
-  .todo-card,
-  .event-card {
-    padding: 13px 14px;
-    gap: 8px;
-  }
-
-  .todo-card .card-top,
-  .event-card .card-top {
-    flex-wrap: nowrap;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .todo-card .card-top > div:first-child,
-  .event-card .card-top > div:first-child {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /* 手機版隱藏卡片內橫排文字操作鈕，改顯示右上角 ⋮ */
-  .todo-card .icon-actions,
-  .event-card .icon-actions {
-    display: none;
-  }
-
-  .card-more-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 30px;
-    height: 30px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-strong);
-    background: var(--bg-card);
-    color: var(--ink-secondary);
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1;
-    padding: 0;
-  }
-
-  .card-more-btn:active {
-    background: var(--accent-soft);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  /* 活動卡片手機版：上方改顯示活動日，提醒日移入更多詳情 */
-  .event-remind-meta,
-  .mobile-hide-detail {
-    display: none;
-  }
-
-  .mobile-only-event-date {
-    display: inline;
-  }
-
-  .mobile-only-detail {
-    display: block;
-  }
-
-  /* 更多詳情折疊區塊 */
-  .mobile-card-details-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .mobile-details-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    border: 1px dashed var(--border-strong);
-    background: var(--bg-card);
-    color: var(--ink-secondary);
-    font-size: 12.5px;
-    font-weight: 500;
-  }
-
-  .mobile-details-toggle .details-caret {
-    font-size: 11px;
-    transition: transform 0.2s ease;
-  }
-
-  .mobile-card-details-wrap.is-expanded .mobile-details-toggle {
-    border-style: solid;
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .mobile-card-details-wrap.is-expanded .details-caret {
-    transform: rotate(180deg);
-  }
-
-  .mobile-details-content {
-    display: none;
-    flex-direction: column;
-    gap: 8px;
-    padding-top: 2px;
-  }
-
-  .mobile-card-details-wrap.is-expanded .mobile-details-content {
-    display: flex;
-  }
-}
-
-/* ==================== 電腦版與橫式平板：固定課表捲動視窗＋解除左側卡死（不影響手機版） ==================== */
-@media (min-width: 961px) {
-  /* 解除左側欄黏著，滑動課表以外區域時整頁與左側欄能正常上下捲動 */
-  #tab-teaching .staging-sidebar {
-    position: static;
-  }
-
-  /* 右側課表改為固定高度的獨立捲動視窗，滑到待排區時仍留在身旁方便排課 */
-  #tab-teaching .table-section {
-    position: sticky;
-    top: 128px;
-  }
-
-  #tab-teaching .table-wrapper {
-    max-height: calc(100vh - 180px);
-    min-height: 360px;
-    overflow-y: auto;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-  }
-
-  /* 課表獨立捲動時，表頭（週次／節次／學習內容）維持凍結 */
-  #tab-teaching .progress-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 6;
-    background: var(--bg-soft);
-    box-shadow: inset 0 -1px 0 var(--border);
-  }
-}
-
-/* ==================== 全螢幕課表總覽模式（矩陣視圖・不影響原有版面） ==================== */
-body.is-overview-open {
-  overflow: hidden;
-}
-
-@media (max-width: 960px) {
-  .mobile-teaching-actions {
-    grid-template-columns: 1fr 1fr auto;
-    gap: 8px;
-  }
-
-  .mobile-teaching-actions button {
-    padding: 9px 8px;
-    font-size: 13px;
-    white-space: nowrap;
-  }
-}
-
+/* ==================== 全螢幕課表總覽模式（矩陣視圖） ==================== */
 .overview-overlay {
   position: fixed;
   inset: 0;
@@ -3685,8 +2661,692 @@ body.is-overview-open {
   display: none;
 }
 
-/* 窄螢幕手機：自動縮精簡字距以盡量同屏容納 */
+/* ==================== Responsive：電腦與橫式平板（≥ 961px） ==================== */
+@media (min-width: 961px) {
+  #tab-teaching .staging-sidebar {
+    position: static;
+  }
+
+  #tab-teaching .table-section {
+    position: sticky;
+    top: 128px;
+  }
+
+  #tab-teaching .table-wrapper {
+    max-height: calc(100vh - 180px);
+    min-height: 360px;
+    overflow-y: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  #tab-teaching .progress-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--bg-soft);
+    box-shadow: inset 0 -1px 0 var(--border);
+  }
+}
+
+/* ==================== Responsive：觸控裝置（含橫式平板） ==================== */
+@media (max-width: 960px), (pointer: coarse) {
+  .chip-move-btn {
+    display: inline-flex;
+  }
+}
+
+/* ==================== Responsive：手機與直式平板（≤ 960px） ==================== */
+@media (max-width: 960px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .top-header {
+    position: static;
+  }
+
+  .container,
+  .tab-panel,
+  .teaching-layout,
+  .table-section,
+  .table-wrapper,
+  .staging-box {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .two-col-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .form-panel {
+    position: static;
+  }
+
+  .mobile-only-btn {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* 教學平台：班級標頭三列 ＋ 下拉選單 */
+  .class-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    overflow: visible;
+  }
+
+  .class-bar-left {
+    display: none;
+  }
+
+  .mobile-current-class-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-class-label {
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+
+  .mobile-current-class-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #FFFFFF;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .class-bar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .class-bar-actions > button,
+  .mobile-class-switch-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .mobile-class-dropdown-wrap {
+    display: block;
+    position: relative;
+    width: 100%;
+  }
+
+  .mobile-class-switch-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .mobile-class-switch-btn .dropdown-caret {
+    font-size: 11px;
+    opacity: 0.75;
+  }
+
+  .mobile-class-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 4px;
+    z-index: 95;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .mobile-class-dropdown-menu.hidden {
+    display: none;
+  }
+
+  .mobile-class-option {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--ink-primary);
+    font-size: 13.5px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mobile-class-option.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* 教學平台：設定、新增、總覽按鈕列與彈窗 */
+  .mobile-teaching-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .mobile-teaching-actions button {
+    padding: 9px 8px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .mobile-sheet-wrap {
+    display: none;
+  }
+
+  .mobile-sheet-wrap.is-open {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(51, 48, 46, 0.5);
+    backdrop-filter: blur(2px);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .mobile-sheet-wrap.is-open > .card {
+    width: 100%;
+    max-width: 520px;
+    max-height: 86vh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 18px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .mobile-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-serif);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink-primary);
+  }
+
+  .mobile-sheet-footer {
+    display: block;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .desktop-only-title {
+    display: none;
+  }
+
+  /* 教學平台：固定課表視窗 ＋ 下方待排區 */
+  .teaching-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .staging-sidebar {
+    display: contents;
+  }
+
+  .table-section {
+    order: 1;
+    padding: 10px;
+  }
+
+  .table-wrapper {
+    max-height: 46vh;
+    min-height: 230px;
+    overflow-y: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .progress-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--bg-soft);
+    box-shadow: inset 0 -1px 0 var(--border);
+  }
+
+  .col-content .th-sub {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--ink-muted);
+    margin-top: 2px;
+    line-height: 1.25;
+  }
+
+  .staging-box {
+    order: 2;
+    position: sticky;
+    bottom: 6px;
+    z-index: 35;
+    padding: 10px 12px;
+    border: 1.5px solid var(--accent);
+    box-shadow: 0 -6px 20px rgba(51, 48, 46, 0.14);
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(6px);
+  }
+
+  .staging-box .staging-header {
+    margin-bottom: 8px;
+  }
+
+  .staging-box .staging-list {
+    width: 100%;
+    max-width: 100%;
+    min-height: 56px;
+    max-height: 126px;
+    padding: 8px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    gap: 6px;
+  }
+
+  .staging-box .staging-list .plan-chip {
+    flex-shrink: 1;
+    max-width: 100%;
+  }
+
+  .staging-box .staging-list .chip-desc {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .staging-box .empty-drop-hint {
+    padding: 8px 6px;
+    white-space: normal;
+  }
+
+  .staging-box.is-collapsed .staging-header {
+    margin-bottom: 0;
+  }
+
+  .staging-box.is-collapsed .staging-list {
+    display: none;
+  }
+
+  /* 課表內課務方塊：水平對齊、⋮ 收納鈕、內容限兩排捲動 */
+  .drop-cell .plan-chip,
+  .drop-cell .plan-chip.has-desc {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 6px 5px 6px 9px;
+    gap: 6px;
+  }
+
+  .drop-cell .plan-chip .chip-actions {
+    display: none !important;
+  }
+
+  .drop-cell .plan-chip .chip-content-scroll {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: left;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    max-height: 46px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding: 0;
+  }
+
+  .drop-cell .plan-chip .chip-main-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 5px;
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .drop-cell .plan-chip .chip-type {
+    font-size: 10.5px;
+    padding: 0 5px;
+    line-height: 1.4;
+  }
+
+  .drop-cell .plan-chip .chip-desc {
+    width: 100%;
+    text-align: left;
+    font-size: 11px;
+    line-height: 1.35;
+    padding-top: 2px;
+  }
+
+  .drop-cell .plan-chip .chip-more-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.35);
+    color: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .drop-cell .plan-chip .chip-more-btn:active {
+    background: rgba(255, 255, 255, 0.6);
+  }
+
+  /* 待辦與活動卡片：⋮ 操作鈕 ＋ 更多詳情折疊 */
+  .todo-card,
+  .event-card {
+    padding: 13px 14px;
+    gap: 8px;
+  }
+
+  .todo-card .card-top,
+  .event-card .card-top {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .todo-card .card-top > div:first-child,
+  .event-card .card-top > div:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .todo-card .icon-actions,
+  .event-card .icon-actions {
+    display: none;
+  }
+
+  .card-more-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--bg-card);
+    color: var(--ink-secondary);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .card-more-btn:active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .event-remind-meta,
+  .mobile-hide-detail {
+    display: none;
+  }
+
+  .mobile-only-event-date {
+    display: inline;
+  }
+
+  .mobile-only-detail {
+    display: block;
+  }
+
+  .mobile-card-details-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .mobile-details-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border-strong);
+    background: var(--bg-card);
+    color: var(--ink-secondary);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
+  .mobile-details-toggle .details-caret {
+    font-size: 11px;
+    transition: transform 0.2s ease;
+  }
+
+  .mobile-card-details-wrap.is-expanded .mobile-details-toggle {
+    border-style: solid;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .mobile-card-details-wrap.is-expanded .details-caret {
+    transform: rotate(180deg);
+  }
+
+  .mobile-details-content {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 2px;
+  }
+
+  .mobile-card-details-wrap.is-expanded .mobile-details-content {
+    display: flex;
+  }
+}
+
+/* ==================== Responsive：活動小日曆改單欄（≤ 780px） ==================== */
+@media (max-width: 780px) {
+  .event-cal-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cal-detail-pane {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 14px;
+    min-height: auto;
+  }
+}
+
+/* ==================== Responsive：窄螢幕手機微調（≤ 720px） ==================== */
 @media (max-width: 720px) {
+  /* 頁首按鈕併為同排 */
+  .header-inner {
+    padding: 12px 16px 8px;
+    gap: 8px;
+  }
+
+  .brand h1 {
+    font-size: 20px;
+  }
+
+  .header-meta {
+    width: 100%;
+    gap: 6px 8px;
+  }
+
+  .today-pill,
+  .sync-pill {
+    font-size: 11.5px;
+    padding: 4px 10px;
+  }
+
+  .header-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .header-actions-row .user-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .header-actions-row .user-email-pill {
+    min-width: 0;
+    flex: 0 1 auto;
+    max-width: 100%;
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .header-actions-row .backup-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .header-actions-row .btn-ghost {
+    padding: 4px 8px;
+    font-size: 11.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* 課表欄位：週次維持單排不換行、節次縮窄 */
+  .col-week {
+    width: 78px;
+  }
+
+  .col-period {
+    width: 64px;
+  }
+
+  .progress-table th {
+    padding: 8px 4px;
+    font-size: 13px;
+  }
+
+  .week-cell,
+  .period-cell {
+    padding: 6px 3px;
+  }
+
+  .week-cell {
+    white-space: nowrap;
+    font-size: 12.5px;
+  }
+
+  .week-date-range {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    white-space: nowrap;
+    font-size: 9.5px;
+    letter-spacing: -0.03em;
+    line-height: 1.3;
+    margin-top: 4px;
+  }
+
+  .period-cell {
+    font-size: 11.5px;
+  }
+
+  .period-cell-inner {
+    gap: 2px;
+  }
+
+  .period-date-tag {
+    font-size: 10.5px;
+    letter-spacing: -0.02em;
+  }
+
+  .pin-today-btn {
+    font-size: 10px;
+    padding: 1px 4px;
+    white-space: nowrap;
+  }
+
+  .drop-cell {
+    padding: 6px 5px;
+  }
+
+  .cell-items {
+    gap: 5px;
+  }
+
+  /* 全螢幕總覽模式窄螢幕精簡 */
   .overview-topbar {
     padding: 8px 10px;
     gap: 6px;
@@ -3754,4 +3414,55 @@ body.is-overview-open {
   .ov-chip-desc {
     font-size: 9.5px;
   }
+}
+
+/* ==================== Responsive：首頁秘書立繪與表單（≤ 680px / ≤ 600px） ==================== */
+@media (max-width: 680px) {
+  .rpg-stage {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .rpg-dialogue-box {
+    width: 100%;
+  }
+
+  .rpg-dialogue-box::before {
+    left: 50%;
+    top: -10px;
+    bottom: auto;
+    transform: translateX(-50%) rotate(135deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 16px;
+  }
+
+  .field-row {
+    flex-direction: column;
+  }
+}
+
+/* ==================== 編輯視窗按鈕自動換行 ＋ 全螢幕總覽拖曳樣式 ==================== */
+.modal-footer {
+  flex-wrap: wrap;
+}
+
+.ov-chip {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.ov-chip.dragging-source {
+  opacity: 0.35;
+}
+
+.ov-cell.drag-over {
+  background: var(--accent-soft) !important;
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
 }

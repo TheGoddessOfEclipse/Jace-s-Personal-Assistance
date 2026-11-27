@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=12" />
+  <link rel="stylesheet" href="style.css?v=15" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -109,7 +109,7 @@
         <div class="briefing-unified-head">
           <div>
             <h2>Today's Briefing</h2>
-            <p id="briefingSubHint" class="hint">條列整合三大平台重點：勾選即同步更新狀態（待辦事項將進一步確認進度）</p>
+            <p id="briefingSubHint" class="hint">條列整合三大平台重點：勾選即同步更新狀態（待辦事項與非當天活動將進一步確認處理方式）</p>
           </div>
           <div class="briefing-quick-links">
             <button type="button" class="btn-ghost-sm" data-jump-tab="teaching">教學進度</button>
@@ -166,7 +166,7 @@
           <div id="classTabsContainer" class="class-tabs"></div>
         </div>
 
-        <!-- 電腦版維持一排；手機版自動拆成第 2 列（班級切換▾ + 新增班級）與第 3 列（重新命名 + 刪除班級） -->
+        <!-- 電腦版維持一排；手機版拆成第 2 列（班級切換▾ + 新增班級）與第 3 列（重新命名 + 刪除班級） -->
         <div class="class-bar-actions">
           <div class="mobile-class-dropdown-wrap">
             <button type="button" id="mobileClassDropdownBtn" class="btn-ghost mobile-class-switch-btn" aria-expanded="false">
@@ -390,7 +390,7 @@
     <!-- ==================== 第三部分：活動提醒平台 ==================== -->
     <section id="tab-event" class="tab-panel">
       <!-- 上方：小日曆與當日詳情面板 -->
-      <div class="card event-calendar-card" style="margin-bottom: 22px;">
+      <div class="card event-calendar-card">
         <div class="event-cal-layout">
           <div class="cal-box">
             <div class="cal-header">
@@ -500,7 +500,7 @@
       </div>
     </div>
   </div>
-  
+
   <!-- ==================== Modal：手機版課務更多操作（⋮） ==================== -->
   <div id="chipMoreModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
@@ -530,7 +530,7 @@
       </div>
     </div>
   </div>
-  
+
   <!-- ==================== Modals ==================== -->
   <div id="planModal" class="modal-backdrop hidden">
     <div class="modal-card">
@@ -561,21 +561,6 @@
             </div>
             <input type="color" id="editPlanColor" value="#DDE6D5" title="自訂顏色" />
           </div>
-        </div>
-        <div class="field">
-          <label>標籤顏色</label>
-          <div class="color-picker-row">
-            <div id="editPlanColorPresets" class="color-swatches">
-              <button type="button" class="swatch" data-color="#DDE6D5" style="background:#DDE6D5" title="鼠尾草綠"></button>
-              <button type="button" class="swatch" data-color="#F2E2CE" style="background:#F2E2CE" title="燕麥奶茶"></button>
-              <button type="button" class="swatch" data-color="#EFD9D6" style="background:#EFD9D6" title="乾燥玫瑰"></button>
-              <button type="button" class="swatch" data-color="#D8E3EA" style="background:#D8E3EA" title="霧霾藍"></button>
-              <button type="button" class="swatch" data-color="#E4DCEB" style="background:#E4DCEB" title="薰衣草灰"></button>
-              <button type="button" class="swatch" data-color="#EFE7C6" style="background:#EFE7C6" title="淡奶油黃"></button>
-            </div>
-            <input type="color" id="editPlanColor" value="#DDE6D5" title="自訂顏色" />
-          </div>
-        </div>
         </div>
         <div class="field">
           <label for="editPlanDesc">詳細備註</label>
@@ -750,7 +735,7 @@
       </div>
     </div>
   </div>
-  
+
   <div id="todoResolveModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
       <div class="modal-header">
@@ -929,5 +914,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=23"></script></body>
+  <script src="script.js?v=25"></script>
+</body>
 </html>
