@@ -2790,3 +2790,49 @@ body.is-touch-dragging {
     padding: 10px 12px;
   }
 }
+
+/* ==================== 修正手機版待排區撐爆寬度導致整頁縮小（不影響電腦版） ==================== */
+@media (max-width: 960px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .container,
+  .tab-panel,
+  .teaching-layout,
+  .table-section,
+  .table-wrapper,
+  .staging-box {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  /* 待排區改為自動換行＋固定高度盒內上下捲動，不再橫向無限拉長 */
+  .staging-box .staging-list {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    min-height: 56px;
+    max-height: 126px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    align-content: flex-start;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 6px;
+  }
+
+  .staging-box .staging-list .plan-chip {
+    flex-shrink: 1;
+    max-width: 100%;
+  }
+
+  .staging-box .empty-drop-hint {
+    white-space: normal;
+  }
+}
