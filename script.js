@@ -42,6 +42,7 @@
   let selectedPlanIds = new Set();
   let movingPlanId = null;
   let isStagingDockCollapsed = false;
+  let isOverviewOpen = false;
   let overviewFitScreen = true;
   let overviewShowDesc = true;
 
