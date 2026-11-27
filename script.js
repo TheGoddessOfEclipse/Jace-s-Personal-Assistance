@@ -2016,6 +2016,42 @@
     }
   }
 
+  function openMobileSheet(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('is-open');
+  }
+
+  function closeMobileSheet(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('is-open');
+  }
+
+  on('openMobileConfigBtn', 'click', () => openMobileSheet('mobileConfigSheet'));
+  on('openMobileAddPlanBtn', 'click', () => {
+    openMobileSheet('mobileAddPlanSheet');
+    setTimeout(() => {
+      const el = document.getElementById('planName');
+      if (el) el.focus();
+    }, 60);
+  });
+
+  document.querySelectorAll('[data-close-sheet]').forEach(btn => {
+    btn.addEventListener('click', () => closeMobileSheet(btn.dataset.closeSheet));
+  });
+
+  document.querySelectorAll('.mobile-sheet-wrap').forEach(sheet => {
+    let startedOnBackdrop = false;
+    sheet.addEventListener('pointerdown', (e) => {
+      startedOnBackdrop = (e.target === sheet);
+    });
+    sheet.addEventListener('click', (e) => {
+      if (startedOnBackdrop && e.target === sheet) {
+        sheet.classList.remove('is-open');
+      }
+      startedOnBackdrop = false;
+    });
+  });
+
   function initTeaching() {
     on('toggleStagingDockBtn', 'click', () => {
       isStagingDockCollapsed = !isStagingDockCollapsed;
@@ -2034,7 +2070,10 @@
         movePlanItemToLocation(movingPlanId, { type: 'staging' });
       }
     });
-    on('toggleMultiSelectBtn', 'click', () => setMultiSelectMode(!isMultiSelectMode));
+    on('toggleMultiSelectBtn', 'click', () => {
+    closeMobileSheet('mobileConfigSheet');
+    setMultiSelectMode(!isMultiSelectMode);
+    });
     on('stagingMultiBtn', 'click', () => setMultiSelectMode(!isMultiSelectMode));
     on('exitMultiSelectBtn', 'click', () => setMultiSelectMode(false));
 
@@ -2164,6 +2203,7 @@
           ? `「${cls.name}」表格已更新，${returnedCount} 項超出範圍事項已退回待排區`
           : `已更新「${cls.name}」為 ${w} 週 × 每週 ${p} 堂`
       );
+      closeMobileSheet('mobileConfigSheet');
     });
     const colorInput = document.getElementById('planColor');
     document.querySelectorAll('#planColorPresets .swatch').forEach(swatch => {
@@ -2402,17 +2442,46 @@
 
       const runAutoScroll = () => {
         if (!isDragging) return;
-        const edge = 90;
-        const maxSpeed = 12;
-        let delta = 0;
-        if (lastClientY < edge) {
-          delta = -Math.ceil(((edge - lastClientY) / edge) * maxSpeed);
-        } else if (lastClientY > window.innerHeight - edge) {
-          delta = Math.ceil(((lastClientY - (window.innerHeight - edge)) / edge) * maxSpeed);
+        let scrolled = false;
+
+        // 優先支援手機固定課表視窗內部上下捲動
+        const tableWrap = document.querySelector('#tab-teaching .table-wrapper');
+        if (tableWrap && tableWrap.scrollHeight > tableWrap.clientHeight) {
+          const rect = tableWrap.getBoundingClientRect();
+          if (
+            lastClientX >= rect.left &&
+            lastClientX <= rect.right &&
+            lastClientY >= rect.top &&
+            lastClientY <= rect.bottom
+          ) {
+            const innerEdge = 56;
+            let innerDelta = 0;
+            if (lastClientY < rect.top + innerEdge) {
+              innerDelta = -Math.ceil(((rect.top + innerEdge - lastClientY) / innerEdge) * 10);
+            } else if (lastClientY > rect.bottom - innerEdge) {
+              innerDelta = Math.ceil(((lastClientY - (rect.bottom - innerEdge)) / innerEdge) * 10);
+            }
+            if (innerDelta !== 0) {
+              tableWrap.scrollTop += innerDelta;
+              moveGhost(lastClientX, lastClientY);
+              scrolled = true;
+            }
+          }
         }
-        if (delta !== 0) {
-          window.scrollBy(0, delta);
-          moveGhost(lastClientX, lastClientY);
+
+        if (!scrolled) {
+          const edge = 90;
+          const maxSpeed = 12;
+          let delta = 0;
+          if (lastClientY < edge) {
+            delta = -Math.ceil(((edge - lastClientY) / edge) * maxSpeed);
+          } else if (lastClientY > window.innerHeight - edge) {
+            delta = Math.ceil(((lastClientY - (window.innerHeight - edge)) / edge) * maxSpeed);
+          }
+          if (delta !== 0) {
+            window.scrollBy(0, delta);
+            moveGhost(lastClientX, lastClientY);
+          }
         }
         autoScrollRaf = requestAnimationFrame(runAutoScroll);
       };

@@ -2601,3 +2601,192 @@ body.is-touch-dragging {
     display: none;
   }
 }
+
+/* ==================== 行動端專屬優化：頁首同排、彈窗按鈕、固定課表視窗（不影響電腦版） ==================== */
+
+/* 電腦版維持透明結構、隱藏手機專用元件 */
+.header-actions-row,
+.mobile-sheet-wrap {
+  display: contents;
+}
+
+.mobile-teaching-actions,
+.mobile-sheet-header,
+.mobile-sheet-footer {
+  display: none;
+}
+
+/* 窄螢幕手機：讓 登出、匯出備份、匯入還原 併在同一排 */
+@media (max-width: 720px) {
+  .header-inner {
+    padding: 12px 16px 8px;
+    gap: 8px;
+  }
+
+  .brand h1 {
+    font-size: 20px;
+  }
+
+  .header-meta {
+    width: 100%;
+    gap: 6px 8px;
+  }
+
+  .today-pill,
+  .sync-pill {
+    font-size: 11.5px;
+    padding: 4px 10px;
+  }
+
+  .header-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    flex-wrap: nowrap;
+  }
+
+  .header-actions-row .user-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .header-actions-row .user-email-pill {
+    min-width: 0;
+    flex: 0 1 auto;
+    max-width: 100%;
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  .header-actions-row .backup-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .header-actions-row .btn-ghost {
+    padding: 4px 8px;
+    font-size: 11.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* 手機與直式平板：進度表設定與新增收成按鈕彈窗 ＋ 固定課表捲動視窗 */
+@media (max-width: 960px) {
+  .top-header {
+    position: static;
+  }
+
+  .class-bar {
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    gap: 10px;
+  }
+
+  .mobile-teaching-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .mobile-teaching-actions button {
+    padding: 9px 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+
+  /* 彈窗容器：平常隱藏，點按鈕才展開 */
+  .mobile-sheet-wrap {
+    display: none;
+  }
+
+  .mobile-sheet-wrap.is-open {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(51, 48, 46, 0.5);
+    backdrop-filter: blur(2px);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .mobile-sheet-wrap.is-open > .card {
+    width: 100%;
+    max-width: 520px;
+    max-height: 86vh;
+    overflow-y: auto;
+    margin: 0;
+    padding: 18px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .mobile-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-serif);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink-primary);
+  }
+
+  .mobile-sheet-footer {
+    display: block;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .desktop-only-title {
+    display: none;
+  }
+
+  /* 固定課表視窗：只在視窗內部上下捲動，表頭凍結 */
+  .teaching-layout {
+    gap: 12px;
+  }
+
+  .table-section {
+    order: 1;
+    padding: 10px;
+  }
+
+  .table-wrapper {
+    max-height: 46vh;
+    min-height: 230px;
+    overflow-y: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .progress-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    background: var(--bg-soft);
+    box-shadow: inset 0 -1px 0 var(--border);
+  }
+
+  /* 待排區緊接在固定課表視窗正下方，一眼可見 */
+  .staging-box {
+    order: 2;
+    position: sticky;
+    bottom: 6px;
+    padding: 10px 12px;
+  }
+}

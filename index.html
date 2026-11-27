@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -38,14 +38,16 @@
       <div class="header-meta">
         <span id="todayDateDisplay" class="today-pill"></span>
         <span id="syncStatusBadge" class="sync-pill local">等待登入</span>
-        <div id="userControls" class="user-controls hidden">
-          <span id="userEmailDisplay" class="user-email-pill"></span>
-          <button type="button" id="logoutBtn" class="btn-ghost">登出</button>
-        </div>
-        <div class="backup-actions">
-          <button type="button" id="exportDataBtn" class="btn-ghost" title="匯出資料備份">匯出備份</button>
-          <button type="button" id="importDataBtn" class="btn-ghost" title="還原資料備份">匯入還原</button>
-          <input type="file" id="importFileInput" accept=".json" hidden />
+        <div class="header-actions-row">
+          <div id="userControls" class="user-controls hidden">
+            <span id="userEmailDisplay" class="user-email-pill"></span>
+            <button type="button" id="logoutBtn" class="btn-ghost">登出</button>
+          </div>
+          <div class="backup-actions">
+            <button type="button" id="exportDataBtn" class="btn-ghost" title="匯出資料備份">匯出備份</button>
+            <button type="button" id="importDataBtn" class="btn-ghost" title="還原資料備份">匯入還原</button>
+            <input type="file" id="importFileInput" accept=".json" hidden />
+          </div>
         </div>
       </div>
     </div>
@@ -163,31 +165,47 @@
         </div>
       </div>
 
-      <div class="panel-toolbar card">
-        <div class="toolbar-top-row">
-          <div class="toolbar-title">
-            <h2 id="activeClassHeading">進度表設定</h2>
-            <p class="hint">操作提示：拖曳或長按移位｜點一下標記完成｜點項目上的 ✎ 編輯、❐ 複製｜設定第一週日期與星期後將自動依日期推算今日進度</p>
+      <!-- 手機／直式平板專用按鈕列（電腦版自動隱藏） -->
+      <div class="mobile-teaching-actions">
+        <button type="button" id="openMobileConfigBtn" class="btn-ghost">⚙ 進度表設定</button>
+        <button type="button" id="openMobileAddPlanBtn" class="btn-primary">＋ 新增待排事項</button>
+      </div>
+
+      <div id="mobileConfigSheet" class="mobile-sheet-wrap">
+        <div class="panel-toolbar card">
+          <div class="mobile-sheet-header">
+            <span>班級進度表設定</span>
+            <button type="button" class="modal-close" data-close-sheet="mobileConfigSheet">&times;</button>
           </div>
-          <div class="grid-config-form">
-            <label class="inline-field">
-              <span>總週數</span>
-              <input type="number" id="weeksInput" min="1" max="40" value="6" />
-            </label>
-            <label class="inline-field">
-              <span>每週堂數</span>
-              <input type="number" id="periodsInput" min="1" max="15" value="4" />
-            </label>
-            <label class="inline-field">
-              <span>第一週日期</span>
-              <input type="date" id="week1StartDateInput" title="選擇第一週的任一天，系統會自動對齊該週週一" />
-            </label>
-            <button type="button" id="generateTableBtn" class="btn-primary">生成／更新表格</button>
-            <button type="button" id="toggleMultiSelectBtn" class="btn-ghost">☑ 多選複製</button>
+          <div class="toolbar-top-row">
+            <div class="toolbar-title">
+              <h2 id="activeClassHeading">進度表設定</h2>
+              <p class="hint">操作提示：拖曳或長按移位｜點一下標記完成｜點項目上的 ✎ 編輯、❐ 複製｜設定第一週日期與星期後將自動依日期推算今日進度</p>
+            </div>
+            <div class="grid-config-form">
+              <label class="inline-field">
+                <span>總週數</span>
+                <input type="number" id="weeksInput" min="1" max="40" value="6" />
+              </label>
+              <label class="inline-field">
+                <span>每週堂數</span>
+                <input type="number" id="periodsInput" min="1" max="15" value="4" />
+              </label>
+              <label class="inline-field">
+                <span>第一週日期</span>
+                <input type="date" id="week1StartDateInput" title="選擇第一週的任一天，系統會自動對齊該週週一" />
+              </label>
+              <button type="button" id="generateTableBtn" class="btn-primary">生成／更新表格</button>
+              <button type="button" id="toggleMultiSelectBtn" class="btn-ghost">☑ 多選複製</button>
+            </div>
+          </div>
+
+          <div id="periodWeekdayBar" class="period-weekday-bar"></div>
+
+          <div class="mobile-sheet-footer">
+            <button type="button" class="btn-ghost full-width" data-close-sheet="mobileConfigSheet">完成並關閉</button>
           </div>
         </div>
-
-        <div id="periodWeekdayBar" class="period-weekday-bar"></div>
       </div>
 
       <!-- 多選批次複製工具列 -->
@@ -213,36 +231,45 @@
 
       <div class="teaching-layout">
         <aside class="staging-sidebar">
-          <div class="card">
-            <h3>新增待排事項</h3>
-            <div class="form-stack">
-              <div class="field">
-                <label for="planName">事項名稱 *</label>
-                <input type="text" id="planName" placeholder="例如：L3 課文導讀、文法小考" />
+          <div id="mobileAddPlanSheet" class="mobile-sheet-wrap">
+            <div class="card add-plan-card">
+              <div class="mobile-sheet-header">
+                <span>新增待排事項</span>
+                <button type="button" class="modal-close" data-close-sheet="mobileAddPlanSheet">&times;</button>
               </div>
-              <div class="field">
-                <label for="planType">性質</label>
-                <input type="text" id="planType" placeholder="例如：課文、文法、聽力、評量" />
-              </div>
-              <div class="field">
-                <label>標籤顏色</label>
-                <div class="color-picker-row">
-                  <div id="planColorPresets" class="color-swatches">
-                    <button type="button" class="swatch active" data-color="#DDE6D5" style="background:#DDE6D5" title="鼠尾草綠"></button>
-                    <button type="button" class="swatch" data-color="#F2E2CE" style="background:#F2E2CE" title="燕麥奶茶"></button>
-                    <button type="button" class="swatch" data-color="#EFD9D6" style="background:#EFD9D6" title="乾燥玫瑰"></button>
-                    <button type="button" class="swatch" data-color="#D8E3EA" style="background:#D8E3EA" title="霧霾藍"></button>
-                    <button type="button" class="swatch" data-color="#E4DCEB" style="background:#E4DCEB" title="薰衣草灰"></button>
-                    <button type="button" class="swatch" data-color="#EFE7C6" style="background:#EFE7C6" title="淡奶油黃"></button>
-                  </div>
-                  <input type="color" id="planColor" value="#DDE6D5" title="自訂顏色" />
+              <h3 class="desktop-only-title">新增待排事項</h3>
+              <div class="form-stack">
+                <div class="field">
+                  <label for="planName">事項名稱 *</label>
+                  <input type="text" id="planName" placeholder="例如：L3 課文導讀、文法小考" />
                 </div>
+                <div class="field">
+                  <label for="planType">性質</label>
+                  <input type="text" id="planType" placeholder="例如：課文、文法、聽力、評量" />
+                </div>
+                <div class="field">
+                  <label>標籤顏色</label>
+                  <div class="color-picker-row">
+                    <div id="planColorPresets" class="color-swatches">
+                      <button type="button" class="swatch active" data-color="#DDE6D5" style="background:#DDE6D5" title="鼠尾草綠"></button>
+                      <button type="button" class="swatch" data-color="#F2E2CE" style="background:#F2E2CE" title="燕麥奶茶"></button>
+                      <button type="button" class="swatch" data-color="#EFD9D6" style="background:#EFD9D6" title="乾燥玫瑰"></button>
+                      <button type="button" class="swatch" data-color="#D8E3EA" style="background:#D8E3EA" title="霧霾藍"></button>
+                      <button type="button" class="swatch" data-color="#E4DCEB" style="background:#E4DCEB" title="薰衣草灰"></button>
+                      <button type="button" class="swatch" data-color="#EFE7C6" style="background:#EFE7C6" title="淡奶油黃"></button>
+                    </div>
+                    <input type="color" id="planColor" value="#DDE6D5" title="自訂顏色" />
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="planDesc">詳細備註（選填）</label>
+                  <textarea id="planDesc" rows="2" placeholder="頁數、學習單、需準備教具等..."></textarea>
+                </div>
+                <button type="button" id="addPlanItemBtn" class="btn-primary full-width">加入待排區</button>
               </div>
-              <div class="field">
-                <label for="planDesc">詳細備註（選填）</label>
-                <textarea id="planDesc" rows="2" placeholder="頁數、學習單、需準備教具等..."></textarea>
+              <div class="mobile-sheet-footer">
+                <button type="button" class="btn-ghost full-width" data-close-sheet="mobileAddPlanSheet">完成並關閉</button>
               </div>
-              <button type="button" id="addPlanItemBtn" class="btn-primary full-width">加入待排區</button>
             </div>
           </div>
 
@@ -803,5 +830,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=18"></script></body>
+  <script src="script.js?v=19"></script></body>
 </html>
