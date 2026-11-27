@@ -3209,3 +3209,142 @@ body.is-touch-dragging {
 .api-key-masked {
   -webkit-text-security: disc;
 }
+
+/* ==================== 手機版優化：待辦與活動卡片 ⋮ 收納鈕 ＋ 更多詳情折疊（不影響電腦版） ==================== */
+
+/* 電腦版維持原狀：隱藏手機專用按鈕與欄位，讓詳情容器完全透明 */
+.card-more-btn,
+.mobile-details-toggle,
+.mobile-only-event-date,
+.mobile-only-detail {
+  display: none;
+}
+
+.mobile-card-details-wrap,
+.mobile-details-content {
+  display: contents;
+}
+
+.resolve-option-btn.danger {
+  border-color: #E3C2C2;
+}
+
+.resolve-option-btn.danger .resolve-opt-title {
+  color: var(--danger);
+}
+
+.resolve-option-btn.danger:hover {
+  border-color: var(--danger);
+  background: #FDF2F2;
+}
+
+@media (max-width: 960px) {
+  .todo-card,
+  .event-card {
+    padding: 13px 14px;
+    gap: 8px;
+  }
+
+  .todo-card .card-top,
+  .event-card .card-top {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .todo-card .card-top > div:first-child,
+  .event-card .card-top > div:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* 手機版隱藏卡片內橫排文字操作鈕，改顯示右上角 ⋮ */
+  .todo-card .icon-actions,
+  .event-card .icon-actions {
+    display: none;
+  }
+
+  .card-more-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--bg-card);
+    color: var(--ink-secondary);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .card-more-btn:active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* 活動卡片手機版：上方改顯示活動日，提醒日移入更多詳情 */
+  .event-remind-meta,
+  .mobile-hide-detail {
+    display: none;
+  }
+
+  .mobile-only-event-date {
+    display: inline;
+  }
+
+  .mobile-only-detail {
+    display: block;
+  }
+
+  /* 更多詳情折疊區塊 */
+  .mobile-card-details-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .mobile-details-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--border-strong);
+    background: var(--bg-card);
+    color: var(--ink-secondary);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
+  .mobile-details-toggle .details-caret {
+    font-size: 11px;
+    transition: transform 0.2s ease;
+  }
+
+  .mobile-card-details-wrap.is-expanded .mobile-details-toggle {
+    border-style: solid;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .mobile-card-details-wrap.is-expanded .details-caret {
+    transform: rotate(180deg);
+  }
+
+  .mobile-details-content {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 2px;
+  }
+
+  .mobile-card-details-wrap.is-expanded .mobile-details-content {
+    display: flex;
+  }
+}

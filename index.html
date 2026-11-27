@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600&family=Noto+Serif+TC:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=11" />
 </head>
 <body>
   <!-- Google 登入閘門 -->
@@ -483,6 +483,22 @@
     </section>
   </main>
 
+  <!-- ==================== Modal：手機版待辦／活動更多操作（⋮） ==================== -->
+  <div id="cardMoreModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3 id="cardMoreTitleDisplay">項目操作</h3>
+        <button type="button" class="modal-close" data-close="cardMoreModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="cardMoreOptions" class="resolve-options"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="cardMoreModal">取消</button>
+      </div>
+    </div>
+  </div>
+  
   <!-- ==================== Modal：手機版課務更多操作（⋮） ==================== -->
   <div id="chipMoreModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
@@ -885,5 +901,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=21"></script></body>
+  <script src="script.js?v=22"></script></body>
 </html>

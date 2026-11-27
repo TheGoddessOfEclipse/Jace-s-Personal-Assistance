@@ -3062,6 +3062,42 @@ for (let w = 1; w <= cls.weeks; w++) {
     });
   }
 
+  function openCardMoreModal(title, actions) {
+    const titleEl = document.getElementById('cardMoreTitleDisplay');
+    const optionsEl = document.getElementById('cardMoreOptions');
+    if (!titleEl || !optionsEl) return;
+    titleEl.textContent = title || '項目操作';
+    optionsEl.innerHTML = '';
+    actions.forEach(act => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `resolve-option-btn${act.danger ? ' danger' : ''}`;
+      btn.innerHTML = `
+        <span class="resolve-opt-title">${escapeHtml(act.title)}</span>
+        ${act.desc ? `<span class="resolve-opt-desc">${escapeHtml(act.desc)}</span>` : ''}
+      `;
+      btn.addEventListener('click', () => {
+        closeModal('cardMoreModal');
+        if (typeof act.onClick === 'function') act.onClick();
+      });
+      optionsEl.appendChild(btn);
+    });
+    openModal('cardMoreModal');
+  }
+
+  function bindCardDetailsToggle(card) {
+    const toggleBtn = card.querySelector('[data-toggle-details]');
+    if (!toggleBtn) return;
+    toggleBtn.addEventListener('click', () => {
+      const wrap = toggleBtn.closest('.mobile-card-details-wrap');
+      if (!wrap) return;
+      const expanded = wrap.classList.toggle('is-expanded');
+      toggleBtn.setAttribute('aria-expanded', String(expanded));
+      const labelEl = toggleBtn.querySelector('.details-label');
+      if (labelEl) labelEl.textContent = expanded ? '收合詳情' : '更多詳情';
+    });
+  }
+
   function renderTodos() {
     const filterSource = document.getElementById('todoFilterSource').value;
     const filterStatus = document.getElementById('todoFilterStatus').value;
@@ -3094,9 +3130,25 @@ for (let w = 1; w <= cls.weeks; w++) {
     } else {
       activeFiltered.forEach(todo => {
         const src = getSourceById(todo.sourceId);
+        const hasDetails = !!(todo.content || todo.note);
         const card = document.createElement('article');
         card.className = `todo-card${todo.status === 'today_done' ? ' today-done' : ''}`;
         card.style.borderLeftColor = src.color;
+
+        const detailsHtml = hasDetails
+          ? `
+            <div class="mobile-card-details-wrap">
+              <button type="button" class="mobile-details-toggle" data-toggle-details aria-expanded="false">
+                <span class="details-label">更多詳情</span>
+                <span class="details-caret">▾</span>
+              </button>
+              <div class="mobile-details-content">
+                ${todo.content ? `<div class="card-body">${escapeHtml(todo.content)}</div>` : ''}
+                ${todo.note ? `<div class="card-note">備註：${escapeHtml(todo.note)}</div>` : ''}
+              </div>
+            </div>
+          `
+          : '';
 
         card.innerHTML = `
           <div class="card-top">
@@ -3112,9 +3164,9 @@ for (let w = 1; w <= cls.weeks; w++) {
               <button type="button" class="text-btn" data-edit="${todo.id}">編輯</button>
               <button type="button" class="text-btn danger" data-del="${todo.id}">刪除</button>
             </div>
+            <button type="button" class="card-more-btn" data-card-more title="更多操作" aria-label="更多操作">⋮</button>
           </div>
-          ${todo.content ? `<div class="card-body">${escapeHtml(todo.content)}</div>` : ''}
-          ${todo.note ? `<div class="card-note">備註：${escapeHtml(todo.note)}</div>` : ''}
+          ${detailsHtml}
           <div class="card-actions-bar">
             <div class="status-pills">
               <button type="button" class="status-btn ${todo.status === 'not_started' ? 'active-not-started' : ''}" data-status="not_started">未開始</button>
@@ -3144,16 +3196,27 @@ for (let w = 1; w <= cls.weeks; w++) {
           });
         });
 
-        card.querySelector('[data-copy]').addEventListener('click', () => duplicateTodoItem(todo));
-        card.querySelector('[data-edit]').addEventListener('click', () => openTodoEditModal(todo));
-        card.querySelector('[data-del]').addEventListener('click', () => {
+        const deleteActiveTodo = () => {
           if (!confirm(`確定刪除「${todo.title}」？`)) return;
           state.todos = state.todos.filter(t => t.id !== todo.id);
           saveState();
           renderTodos();
           renderBriefing();
+        };
+
+        card.querySelector('[data-copy]').addEventListener('click', () => duplicateTodoItem(todo));
+        card.querySelector('[data-edit]').addEventListener('click', () => openTodoEditModal(todo));
+        card.querySelector('[data-del]').addEventListener('click', deleteActiveTodo);
+
+        card.querySelector('[data-card-more]').addEventListener('click', () => {
+          openCardMoreModal(todo.title, [
+            { title: '❐ 建立副本', desc: '建立一筆相同內容的新待辦至進行中清單。', onClick: () => duplicateTodoItem(todo) },
+            { title: '✎ 編輯待辦', desc: '修改日期、任務來源、名稱、內容或備註。', onClick: () => openTodoEditModal(todo) },
+            { title: '刪除待辦', desc: '移除此筆待辦事項。', danger: true, onClick: deleteActiveTodo }
+          ]);
         });
 
+        bindCardDetailsToggle(card);
         activeContainer.appendChild(card);
       });
     }
@@ -3167,9 +3230,25 @@ for (let w = 1; w <= cls.weeks; w++) {
     } else {
       historyFiltered.forEach(todo => {
         const src = getSourceById(todo.sourceId);
+        const hasDetails = !!(todo.content || todo.note);
         const card = document.createElement('article');
         card.className = 'todo-card history-card';
         card.style.borderLeftColor = src.color;
+
+        const detailsHtml = hasDetails
+          ? `
+            <div class="mobile-card-details-wrap">
+              <button type="button" class="mobile-details-toggle" data-toggle-details aria-expanded="false">
+                <span class="details-label">更多詳情</span>
+                <span class="details-caret">▾</span>
+              </button>
+              <div class="mobile-details-content">
+                ${todo.content ? `<div class="card-body">${escapeHtml(todo.content)}</div>` : ''}
+                ${todo.note ? `<div class="card-note">備註：${escapeHtml(todo.note)}</div>` : ''}
+              </div>
+            </div>
+          `
+          : '';
 
         card.innerHTML = `
           <div class="card-top">
@@ -3185,14 +3264,12 @@ for (let w = 1; w <= cls.weeks; w++) {
               <button type="button" class="text-btn" data-restore="${todo.id}">復原至待辦</button>
               <button type="button" class="text-btn danger" data-del="${todo.id}">永久刪除</button>
             </div>
+            <button type="button" class="card-more-btn" data-card-more title="更多操作" aria-label="更多操作">⋮</button>
           </div>
-          ${todo.content ? `<div class="card-body">${escapeHtml(todo.content)}</div>` : ''}
-          ${todo.note ? `<div class="card-note">備註：${escapeHtml(todo.note)}</div>` : ''}
+          ${detailsHtml}
         `;
 
-        card.querySelector('[data-copy]').addEventListener('click', () => duplicateTodoItem(todo));
-
-        card.querySelector('[data-restore]').addEventListener('click', () => {
+        const restoreHistoryTodo = () => {
           todo.status = 'not_started';
           todo.completedAt = null;
           todo.todayDoneDate = null;
@@ -3200,16 +3277,29 @@ for (let w = 1; w <= cls.weeks; w++) {
           renderTodos();
           renderBriefing();
           showToast('已復原至進行中待辦');
-        });
+        };
 
-        card.querySelector('[data-del]').addEventListener('click', () => {
+        const deleteHistoryTodo = () => {
           if (!confirm(`確定永久刪除歷史紀錄「${todo.title}」？`)) return;
           state.todos = state.todos.filter(t => t.id !== todo.id);
           saveState();
           renderTodos();
           renderBriefing();
+        };
+
+        card.querySelector('[data-copy]').addEventListener('click', () => duplicateTodoItem(todo));
+        card.querySelector('[data-restore]').addEventListener('click', restoreHistoryTodo);
+        card.querySelector('[data-del]').addEventListener('click', deleteHistoryTodo);
+
+        card.querySelector('[data-card-more]').addEventListener('click', () => {
+          openCardMoreModal(todo.title, [
+            { title: '❐ 建立副本', desc: '建立一筆相同內容的新待辦至進行中清單。', onClick: () => duplicateTodoItem(todo) },
+            { title: '↺ 復原至待辦', desc: '將此歷史紀錄移回進行中待辦清單。', onClick: restoreHistoryTodo },
+            { title: '永久刪除', desc: '徹底刪除此筆歷史紀錄。', danger: true, onClick: deleteHistoryTodo }
+          ]);
         });
 
+        bindCardDetailsToggle(card);
         historyContainer.appendChild(card);
       });
     }
@@ -3381,6 +3471,7 @@ for (let w = 1; w <= cls.weeks; w++) {
         const daysLeft = diffDays(today, evt.date);
         const isSnoozed = !isPast && evt.snoozeUntil && today < evt.snoozeUntil;
         const isReminding = !isPast && !isSnoozed && today >= evt.remindDate;
+        const canUnarchive = isPast && evt.archived && evt.date >= today;
 
         let badgeHtml = '';
         if (isPast) {
@@ -3404,7 +3495,8 @@ for (let w = 1; w <= cls.weeks; w++) {
             <div>
               <div class="card-meta">
                 ${badgeHtml}
-                <span class="date-tag">提醒日：${escapeHtml(evt.remindDate)}</span>
+                <span class="date-tag event-remind-meta">提醒日：${escapeHtml(evt.remindDate)}</span>
+                <span class="date-tag mobile-only-event-date">活動日：${escapeHtml(evt.date)}</span>
               </div>
               <div class="card-title" style="margin-top:6px;">${escapeHtml(evt.name)}</div>
             </div>
@@ -3412,67 +3504,97 @@ for (let w = 1; w <= cls.weeks; w++) {
               ${isSnoozed ? `<button type="button" class="text-btn" data-unsnooze="${evt.id}">恢復首頁提醒</button>` : ''}
               <button type="button" class="text-btn" data-copy="${evt.id}">建立副本</button>
               ${!isPast ? `<button type="button" class="text-btn" data-archive="${evt.id}">標記已處理</button>` : ''}
-              ${isPast && evt.archived && evt.date >= today ? `<button type="button" class="text-btn" data-unarchive="${evt.id}">復原</button>` : ''}
+              ${canUnarchive ? `<button type="button" class="text-btn" data-unarchive="${evt.id}">復原</button>` : ''}
               <button type="button" class="text-btn" data-edit="${evt.id}">編輯</button>
               <button type="button" class="text-btn danger" data-del="${evt.id}">刪除</button>
             </div>
+            <button type="button" class="card-more-btn" data-card-more title="更多操作" aria-label="更多操作">⋮</button>
           </div>
-          <div class="event-details-grid">
-            <div class="event-detail-item"><strong>發生日期：</strong>${escapeHtml(evt.date)}</div>
-            <div class="event-detail-item"><strong>活動時間：</strong>${escapeHtml(evt.time || '未填寫')}</div>
-            <div class="event-detail-item"><strong>活動地點：</strong>${escapeHtml(evt.location || '未填寫')}</div>
+          <div class="mobile-card-details-wrap">
+            <button type="button" class="mobile-details-toggle" data-toggle-details aria-expanded="false">
+              <span class="details-label">更多詳情</span>
+              <span class="details-caret">▾</span>
+            </button>
+            <div class="mobile-details-content">
+              <div class="event-details-grid">
+                <div class="event-detail-item mobile-hide-detail"><strong>發生日期：</strong>${escapeHtml(evt.date)}</div>
+                <div class="event-detail-item mobile-only-detail"><strong>提醒日期：</strong>${escapeHtml(evt.remindDate)}</div>
+                <div class="event-detail-item"><strong>活動時間：</strong>${escapeHtml(evt.time || '未填寫')}</div>
+                <div class="event-detail-item"><strong>活動地點：</strong>${escapeHtml(evt.location || '未填寫')}</div>
+              </div>
+              ${evt.note ? `<div class="card-note">備註：${escapeHtml(evt.note)}</div>` : ''}
+            </div>
           </div>
-          ${evt.note ? `<div class="card-note">備註：${escapeHtml(evt.note)}</div>` : ''}
         `;
 
-        const unsnoozeBtn = card.querySelector('[data-unsnooze]');
-        if (unsnoozeBtn) {
-          unsnoozeBtn.addEventListener('click', () => {
-            evt.snoozeUntil = null;
-            saveState();
-            renderEvents();
-            renderBriefing();
-            showToast(`已恢復「${evt.name}」於 Today's Briefing 顯示`);
-          });
-        }
+        const unsnoozeEvent = () => {
+          evt.snoozeUntil = null;
+          saveState();
+          renderEvents();
+          renderBriefing();
+          showToast(`已恢復「${evt.name}」於 Today's Briefing 顯示`);
+        };
 
-        card.querySelector('[data-copy]').addEventListener('click', () => duplicateEventItem(evt));
+        const archiveEvent = () => {
+          evt.archived = true;
+          evt.archivedAt = getTodayStr();
+          evt.snoozeUntil = null;
+          saveState();
+          renderEvents();
+          renderBriefing();
+          showToast(`「${evt.name}」已納入歷史備查`);
+        };
 
-        const archiveBtn = card.querySelector('[data-archive]');
-        if (archiveBtn) {
-          archiveBtn.addEventListener('click', () => {
-            evt.archived = true;
-            evt.archivedAt = getTodayStr();
-            evt.snoozeUntil = null;
-            saveState();
-            renderEvents();
-            renderBriefing();
-            showToast(`「${evt.name}」已納入歷史備查`);
-          });
-        }
+        const unarchiveEvent = () => {
+          evt.archived = false;
+          evt.archivedAt = null;
+          evt.snoozeUntil = null;
+          saveState();
+          renderEvents();
+          renderBriefing();
+          showToast(`已復原活動「${evt.name}」`);
+        };
 
-        const unarchiveBtn = card.querySelector('[data-unarchive]');
-        if (unarchiveBtn) {
-          unarchiveBtn.addEventListener('click', () => {
-            evt.archived = false;
-            evt.archivedAt = null;
-            evt.snoozeUntil = null;
-            saveState();
-            renderEvents();
-            renderBriefing();
-            showToast(`已復原活動「${evt.name}」`);
-          });
-        }
-
-        card.querySelector('[data-edit]').addEventListener('click', () => openEventEditModal(evt));
-        card.querySelector('[data-del]').addEventListener('click', () => {
+        const deleteEvent = () => {
           if (!confirm(`確定刪除活動「${evt.name}」？`)) return;
           state.events = state.events.filter(e => e.id !== evt.id);
           saveState();
           renderEvents();
           renderBriefing();
+        };
+
+        const unsnoozeBtn = card.querySelector('[data-unsnooze]');
+        if (unsnoozeBtn) unsnoozeBtn.addEventListener('click', unsnoozeEvent);
+
+        card.querySelector('[data-copy]').addEventListener('click', () => duplicateEventItem(evt));
+
+        const archiveBtn = card.querySelector('[data-archive]');
+        if (archiveBtn) archiveBtn.addEventListener('click', archiveEvent);
+
+        const unarchiveBtn = card.querySelector('[data-unarchive]');
+        if (unarchiveBtn) unarchiveBtn.addEventListener('click', unarchiveEvent);
+
+        card.querySelector('[data-edit]').addEventListener('click', () => openEventEditModal(evt));
+        card.querySelector('[data-del]').addEventListener('click', deleteEvent);
+
+        card.querySelector('[data-card-more]').addEventListener('click', () => {
+          const actions = [];
+          if (isSnoozed) {
+            actions.push({ title: '🔔 恢復首頁提醒', desc: '立即於 Today\'s Briefing 重新顯示此活動。', onClick: unsnoozeEvent });
+          }
+          actions.push({ title: '❐ 建立副本', desc: '建立一筆相同內容的新活動副本並設定日期。', onClick: () => duplicateEventItem(evt) });
+          if (!isPast) {
+            actions.push({ title: '✓ 標記已處理', desc: '從即將到來移除，並歸檔至歷史備查。', onClick: archiveEvent });
+          }
+          if (canUnarchive) {
+            actions.push({ title: '↺ 復原活動', desc: '將此活動移回即將到來清單。', onClick: unarchiveEvent });
+          }
+          actions.push({ title: '✎ 編輯活動', desc: '修改名稱、日期、時間、地點或備註。', onClick: () => openEventEditModal(evt) });
+          actions.push({ title: '刪除活動', desc: '永久刪除此筆活動紀錄。', danger: true, onClick: deleteEvent });
+          openCardMoreModal(evt.name, actions);
         });
 
+        bindCardDetailsToggle(card);
         container.appendChild(card);
       });
     };
