@@ -617,6 +617,34 @@
     </div>
   </div>
 
+  <!-- ==================== Modal：首頁教學進度處理詢問 ==================== -->
+  <div id="planResolveModal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h3>確認教學進度處理方式</h3>
+        <button type="button" class="modal-close" data-close="planResolveModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="resolvePlanClassId" />
+        <input type="hidden" id="resolvePlanItemId" />
+        <p class="resolve-question">請問「<strong id="resolvePlanTitleDisplay"></strong>」這項教學進度要如何處理？</p>
+        <div class="resolve-options">
+          <button type="button" id="resolvePlanSeenBtn" class="resolve-option-btn">
+            <span class="resolve-opt-title">已看過，今日不再提醒</span>
+            <span class="resolve-opt-desc">今日暫時從 Today's Briefing 隱藏，不標記完成，明日會自動恢復提醒。</span>
+          </button>
+          <button type="button" id="resolvePlanCompleteBtn" class="resolve-option-btn primary">
+            <span class="resolve-opt-title">✓ 代表已完成</span>
+            <span class="resolve-opt-desc">標記此教學事項為已完成，並同步更新至教學進度表與歷史紀錄。</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-close="planResolveModal">取消</button>
+      </div>
+    </div>
+  </div>
+  
   <div id="todoResolveModal" class="modal-backdrop hidden">
     <div class="modal-card modal-sm">
       <div class="modal-header">
@@ -769,5 +797,5 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-  <script src="script.js?v=14"></script></body>
+  <script src="script.js?v=16"></script></body>
 </html>

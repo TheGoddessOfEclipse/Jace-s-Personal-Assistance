@@ -318,6 +318,7 @@
             desc: item.desc || '',
             completed: !!item.completed,
             completedAt: item.completedAt || null,
+            dismissedDate: item.dismissedDate || null,
             location: item.location || { type: 'staging' }
           }))
         };
@@ -407,6 +408,16 @@
         changed = true;
       }
     });
+    if (targetState.teaching && Array.isArray(targetState.teaching.classes)) {
+      targetState.teaching.classes.forEach(cls => {
+        (cls.items || []).forEach(item => {
+          if (item.dismissedDate && item.dismissedDate < today) {
+            item.dismissedDate = null;
+            changed = true;
+          }
+        });
+      });
+    }
     return changed;
   }
 
@@ -998,6 +1009,35 @@
       showToast('已移除秘書圖像');
     });
 
+// ---------- 教學進度處理詢問視窗 ----------
+    on('resolvePlanSeenBtn', 'click', () => {
+      const clsId = document.getElementById('resolvePlanClassId').value;
+      const itemId = document.getElementById('resolvePlanItemId').value;
+      const cls = state.teaching.classes.find(c => c.id === clsId);
+      const item = cls && cls.items.find(i => i.id === itemId);
+      if (!item) return;
+      item.dismissedDate = getTodayStr();
+      saveState();
+      closeModal('planResolveModal');
+      renderBriefing();
+      showToast(`「${item.name}」今日不再提醒，明日將自動恢復`);
+    });
+
+    on('resolvePlanCompleteBtn', 'click', () => {
+      const clsId = document.getElementById('resolvePlanClassId').value;
+      const itemId = document.getElementById('resolvePlanItemId').value;
+      const cls = state.teaching.classes.find(c => c.id === clsId);
+      const item = cls && cls.items.find(i => i.id === itemId);
+      if (!item) return;
+      item.completed = true;
+      item.completedAt = getTodayStr();
+      item.dismissedDate = null;
+      saveState();
+      closeModal('planResolveModal');
+      renderAll();
+      showToast(`已標記「${item.name}」為完成`);
+    });
+
     // ---------- 待辦處理詢問視窗 ----------
     on('resolveTodayDoneBtn', 'click', () => {
       const id = document.getElementById('resolveTodoId').value;
@@ -1103,6 +1143,13 @@
       : '條列整合三大平台重點：勾選即同步更新狀態（待辦事項與非當天活動將進一步確認處理方式）';
   }
 
+  function openPlanResolveModal(cls, item) {
+    document.getElementById('resolvePlanClassId').value = cls.id;
+    document.getElementById('resolvePlanItemId').value = item.id;
+    document.getElementById('resolvePlanTitleDisplay').textContent = `${cls.name}｜${item.name}`;
+    openModal('planResolveModal');
+  }
+  
   function openTodoResolveModal(todo) {
     document.getElementById('resolveTodoId').value = todo.id;
     document.getElementById('resolveTodoTitleDisplay').textContent = todo.title;
@@ -1531,6 +1578,9 @@
     let rowCount = 0;
 
     // 1. 教學進度（各班今日進度 + 下堂課進度）
+    // 1. 教學進度（各班今日進度 + 下堂課進度）
+    let hiddenDismissedPlansCount = 0;
+
     state.teaching.classes.forEach(cls => {
       const { todaySlots, nextSlots } = getClassLessonBriefing(cls);
 
@@ -1538,6 +1588,10 @@
         if (!todaySlot || todaySlot.items.length === 0) return;
         const dateSuffix = todaySlot.shortDate ? `・${todaySlot.shortDate}(${todaySlot.weekdayShort})` : '';
         todaySlot.items.forEach(item => {
+          if (item.dismissedDate === today) {
+            hiddenDismissedPlansCount++;
+            return;
+          }
           if (!item.completed) teachingPending++;
           rowCount++;
           const li = document.createElement('li');
@@ -1561,12 +1615,17 @@
           `;
 
           li.querySelector('input').addEventListener('change', (e) => {
-            item.completed = e.target.checked;
-            item.completedAt = item.completed ? getTodayStr() : null;
+            if (e.target.checked) {
+              e.target.checked = false;
+              openPlanResolveModal(cls, item);
+              return;
+            }
+            item.completed = false;
+            item.completedAt = null;
             saveState();
             renderTeaching();
             renderBriefing();
-            showToast(item.completed ? `已標記「${item.name}」完成` : `已恢復「${item.name}」為未完成`);
+            showToast(`已恢復「${item.name}」為未完成`);
           });
 
           listEl.appendChild(li);
@@ -1577,6 +1636,10 @@
         if (!nextSlot || nextSlot.items.length === 0) return;
         const dateSuffix = nextSlot.shortDate ? `・${nextSlot.shortDate}(${nextSlot.weekdayShort})` : '';
         nextSlot.items.forEach(item => {
+          if (item.dismissedDate === today) {
+            hiddenDismissedPlansCount++;
+            return;
+          }
           rowCount++;
           const li = document.createElement('li');
           li.className = `unified-row is-next-preview${item.completed ? ' is-done' : ''}`;
@@ -1599,12 +1662,17 @@
           `;
 
           li.querySelector('input').addEventListener('change', (e) => {
-            item.completed = e.target.checked;
-            item.completedAt = item.completed ? getTodayStr() : null;
+            if (e.target.checked) {
+              e.target.checked = false;
+              openPlanResolveModal(cls, item);
+              return;
+            }
+            item.completed = false;
+            item.completedAt = null;
             saveState();
             renderTeaching();
             renderBriefing();
-            showToast(item.completed ? `已標記「${item.name}」完成` : `已恢復「${item.name}」為未完成`);
+            showToast(`已恢復「${item.name}」為未完成`);
           });
 
           listEl.appendChild(li);
@@ -1725,6 +1793,9 @@
 
     const footnote = document.getElementById('briefingTodoHiddenHint');
     const hiddenNotes = [];
+    if (hiddenDismissedPlansCount > 0) {
+      hiddenNotes.push(`今日已有 ${hiddenDismissedPlansCount} 項教學進度選擇「已看過，今日不再提醒」（明日自動恢復）`);
+    }
     if (hiddenTodayDoneCount > 0) {
       hiddenNotes.push(`今日已有 ${hiddenTodayDoneCount} 件待辦標記「今日進度已完成」（將於明日自動恢復）`);
     }
@@ -1732,8 +1803,24 @@
       hiddenNotes.push(`另有 ${hiddenSnoozedEventsCount} 個活動已暫停首頁提醒（可至「活動提醒平台」檢視或提前恢復）`);
     }
     if (hiddenNotes.length > 0) {
-      footnote.textContent = `※ ${hiddenNotes.join('；')}。`;
+      footnote.innerHTML = `※ ${escapeHtml(hiddenNotes.join('；'))}。` +
+        (hiddenDismissedPlansCount > 0
+          ? ' <button type="button" id="restoreDismissedPlansBtn" class="text-btn" style="text-decoration:underline;color:var(--accent);">恢復顯示教學提醒</button>'
+          : '');
       footnote.classList.remove('hidden');
+      const restorePlansBtn = document.getElementById('restoreDismissedPlansBtn');
+      if (restorePlansBtn) {
+        restorePlansBtn.addEventListener('click', () => {
+          state.teaching.classes.forEach(cls => {
+            cls.items.forEach(item => {
+              if (item.dismissedDate === today) item.dismissedDate = null;
+            });
+          });
+          saveState();
+          renderBriefing();
+          showToast('已恢復今日隱藏的教學進度提醒');
+        });
+      }
     } else {
       footnote.classList.add('hidden');
     }
@@ -1746,6 +1833,7 @@
         if (!todaySlot || todaySlot.items.length === 0) return;
         const dateText = todaySlot.date ? ` ${todaySlot.date}(${todaySlot.weekdayName})` : '';
         todaySlot.items.forEach(item => {
+          if (item.dismissedDate === today) return;
           teachingSummary.push(
             `[今日・${cls.name} W${todaySlot.week}-第${todaySlot.period}節${dateText}] ${item.completed ? '(已完成)' : '(待教)'} ${item.name}${item.type ? `(${item.type})` : ''}${item.desc ? ` - 備註:${item.desc}` : ''}`
           );
@@ -1755,6 +1843,7 @@
         if (!nextSlot || nextSlot.items.length === 0) return;
         const dateText = nextSlot.date ? ` ${nextSlot.date}(${nextSlot.weekdayName})` : '';
         nextSlot.items.forEach(item => {
+          if (item.dismissedDate === today) return;
           teachingSummary.push(
             `[下堂課・${cls.name} W${nextSlot.week}-第${nextSlot.period}節${dateText}] ${item.name}${item.type ? `(${item.type})` : ''}`
           );
